@@ -38,6 +38,13 @@ Known limits:
 - Vulkan only (Meitou's Metal renderer on macOS is not covered), SDR only.
 - It hooks one step of Meitou's picture chain with a patch; a later Meitou version may need a new build of this mod.
 
+## Planned
+Ideas, no dates:
+- A **CRT wiggle** (the picture rolling and shimmering like an old screen).
+- **Live sliders and named presets** over the picture, alongside the graphics work Meitou's developers have planned.
+- More palettes (the Dust version's table palettes), and macOS (Metal) support.
+- Perhaps as a built-in part of Meitou one day: the shader source is open for that.
+
 ## Reporting a bug
 Which look, a screenshot, your graphics card, resolution and Meitou's graphics settings (upscaler, HDR), your Meitou version and mod list,
 and Meitou's `log.txt` copied right after that session. Our lines start with `pza.looks`. Post it in its thread on the Meitou Discord or in the Workshop page's Bug reports discussion.
