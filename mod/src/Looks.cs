@@ -1,0 +1,76 @@
+// PZA's Looks for Meitou. Author: PZA. Licence: GPLv3 or later.
+// The named looks: the pixel-art effect values of the user's Dust presets of the same names (the pixel-art effect's ini in each Dust preset folder,
+// read 2026-11-17). The player picks a look by name; there are no sliders (the user's rule: ready-made presets, not slider explanations).
+// The Dust presets' other effects (Dust's LUT grade, bloom, outline, vignette...) are not ours: their Meitou counterparts are a Meitou look
+// preset file of the same name (presets\*.json, the port notes "Dust's own settings").
+namespace PZA.Looks.Meitou;
+
+/// <summary>One look's pixel-art effect values, as the shader takes them (Dust's ini keys in the comments).</summary>
+public sealed record PixelLook(
+    string Name,
+    float PixelSize,        // PixelSize (screen pixels per art pixel at 1080 rows, scaled with the height)
+    int Palette,            // Palette: 0 Desert 16, 1 LEAF 2-bit, 2 full colour fewer levels, 3 PS1 15-bit, 4 N64 16-bit, 5 8-bit 3-3-2
+    int Levels,             // Levels (palette 2)
+    float Dither,           // Dither
+    float Contrast,         // Contrast
+    float ShadowLift = 0,   // ShadowLift (faded out in daylight: LiftNight=1 in every look)
+    float HighlightHold = 0,// HighlightHold
+    float Scanlines = 0,    // Scanlines
+    float CrtSoft = 0,      // CrtSoftness
+    float Bleed = 0,        // ColourBleed
+    int Sampling = 0,       // Sampling: 0 centre, 1 cell average
+    float NativeLines = 0); // NativeResolution: 0 off, else the line count (1 = 240)
+
+public static class Looks
+{
+    public const string Off = "Off";
+
+    /// <summary>Every look, in the order the Settings page lists them (after Off).</summary>
+    public static readonly PixelLook[] All =
+    [
+        new("PZA Pixel - 1", 4.09f, 0, 6, 0.6f, 1.15f),
+        new("PZA Pixel - 2", 2.5f, 0, 6, 0.6f, 1.15f),
+        new("PZA Pixel - 3", 8.0f, 0, 6, 0.6f, 1.15f),
+        new("PZA - PS1 Main", 4.09f, 2, 8, 0.6f, 1.0f, HighlightHold: 0.5f, Scanlines: 0.6f, CrtSoft: 0.05f, Bleed: 0.4f),
+        new("PZA PS1 - CRT", 4.0f, 3, 16, 0.04f, 1.05f, ShadowLift: 0.012f, Scanlines: 1f, CrtSoft: 0.385f, Bleed: 1f),
+        new("PZA Soft 240 - Standard", 4.0f, 4, 16, 1.0f, 1.0f, CrtSoft: 0.35f, Sampling: 1, NativeLines: 240),
+    ];
+
+    /// <summary>Off and every look's name: the Settings page's options.</summary>
+    public static readonly string[] Names = [Off, .. All.Select(l => l.Name)];
+
+    /// <summary>The look of that name; null for Off or an unknown name.</summary>
+    public static PixelLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
+
+/// <summary>One Tilt-Shift's values, from the PZATiltShift.ini of the user's Dust presets (keys in the comments). Every one: depth focus
+/// (FocusMode 1), upright plane (Upright 1), the camera's point (FocusPick 1).</summary>
+public sealed record TiltLook(
+    string Name,
+    float FocusCentre,   // FocusCentre (band centre, 0 top .. 1 bottom; the fallback focus taps sit there)
+    float FocusWidth,    // FocusWidth (sharp half-width, screen heights)
+    float Falloff,       // Falloff
+    float BlurPx,        // BlurSize (pixels at 1080 rows)
+    float Top,           // TopAmount (the far side)
+    float Bottom,        // BottomAmount (the near side)
+    float Saturation,    // Saturation
+    float Contrast);     // Contrast
+
+public static class Tilts
+{
+    /// <summary>Every Tilt-Shift, in the Settings page's order (after Off).</summary>
+    public static readonly TiltLook[] All =
+    [
+        // "PZA Combo - 16-Bit Miniature (Pixel 1 + Tilt-Shift)": the wide band the user voted for (ts-16bit-band-1109)
+        new("PZA Miniature", 0.45f, 0.3f, 0.3f, 9f, 1f, 0.85f, 1.12f, 1f),
+        // "PZA Combo - HD-2D (Pixel + Tilt-Shift)"
+        new("PZA HD-2D", 0.45f, 0.12f, 0.3f, 9f, 1f, 0.85f, 1.12f, 1f),
+        // "PZA Diorama - Real (Tilt-Shift)"
+        new("PZA Diorama", 0.45f, 0.12f, 0.3f, 10f, 1f, 0.9f, 1.15f, 1.06f),
+    ];
+
+    /// <summary>Off and every Tilt-Shift's name: the Settings page's options.</summary>
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name)];
+
+    public static TiltLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}

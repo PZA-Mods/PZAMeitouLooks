@@ -1,0 +1,10 @@
+{
+  // PZA's Looks for Meitou (author PZA, GPLv3 or later): PZA's Dust looks (pixel art, PS1, Soft 240, Tilt-Shift) as passes on Meitou's finished picture.
+  // Schema: MeitouClient docs/modding.md "Discovery", docs/modding-dependencies.md "Manifest".
+  "id": "pza.looks",
+  "version": "0.2.5",
+  "apiVersion": 2,
+  "assemblies": ["PZALooks.Meitou.dll"],
+  "entry": "PZA.Looks.Meitou.LooksMod",
+  "gameVersion": ">=0.20.1 <0.22.0"
+}
