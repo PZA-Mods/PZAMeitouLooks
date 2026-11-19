@@ -1,4 +1,4 @@
-# PZA's Looks for Meitou (beta 0.2.5)
+# PZA's Looks for Meitou (beta 0.2.6)
 
 Retro looks for Meitou's picture: chunky pixel art with a desert palette, the PlayStation look with CRT scanlines, a soft 240-line N64
 look, and tilt-shift miniature looks. Menus, text and the pointer stay sharp: the look is drawn under Meitou's interface.
@@ -22,11 +22,10 @@ buttons that drive it.
 "Compare (left half without)" shows the left half of the screen as Meitou draws it, for a before / after.
 
 ## Requires
-**Meitou 0.20.1 up to 0.21.x**, on the **Vulkan** renderer, with **HDR output off** (the looks switch themselves off under HDR). It refuses
-to load on other Meitou versions.
+**Meitou 0.20.1 and newer**, on the **Vulkan** renderer, with **HDR output off** (the looks switch themselves off under HDR). Checked on Meitou 0.20.1, 0.21.0 and 0.22.1; no upper version cap any more.
 
 ## Install
-- Unpack `PZALooks.Meitou-0.2.5-beta.zip` into Kenshi's folder (`Kenshi\mods\PZALooks\`), then tick **PZALooks** in
+- Unpack `PZALooks.Meitou-0.2.6-beta.zip` into Kenshi's folder (`Kenshi\mods\PZALooks\`), then tick **PZALooks** in
   Meitou's mod list.
 - No items or world data; load order doesn't matter. Safe to remove at any time.
 

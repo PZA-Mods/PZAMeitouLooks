@@ -211,12 +211,15 @@ public static class TiltPass
 
     /// <summary>The camera's pitch below the horizon from the view's rotation (System.Numerics LookAt: M13, M23, M33 = the view's back axis,
     /// so the forward axis's height is -M23).</summary>
-    public static float PitchBelowHorizon(System.Numerics.Matrix4x4 view) => MathF.Max(0f, MathF.Asin(Math.Clamp(view.M23, -1f, 1f)));
+    public static float PitchBelowHorizon(System.Numerics.Matrix4x4 view) =>
+        float.IsFinite(view.M23) ? MathF.Max(0f, MathF.Asin(Math.Clamp(view.M23, -1f, 1f))) : 0f;   // fuzz 2026-11-18: a broken view gave NaN uniforms
 
     /// <summary>Dust's plane: normal (0, sin a, cos a) with a = upright x pitch (upright 1 in every PZA preset); the flat-ground factor
     /// sin a + cos a cot p, clamped 0.25..2.</summary>
     public static (System.Numerics.Vector3 N, float Gain) Plane(float pitch, float upright = 1f)
     {
+        if (!float.IsFinite(pitch)) pitch = 0f;
+        if (!float.IsFinite(upright)) upright = 1f;
         float a = Math.Clamp(upright, 0f, 1f) * pitch;
         var n = new System.Numerics.Vector3(0f, MathF.Sin(a), MathF.Cos(a));
         float sp = MathF.Max(MathF.Sin(pitch), 0.05f);
