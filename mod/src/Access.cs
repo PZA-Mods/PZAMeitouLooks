@@ -1,4 +1,4 @@
-// PZA's Looks for Meitou. Author: PZA. Licence: GPLv3 or later.
+// PZA's Post-FX for Meitou. Author: PZA. Licence: GPLv3 or later.
 // The game's post-chain members this mod reaches, resolved once by name (MeitouClient 0.20.1, src/Meitou.Game/Rendering/Post/PostProcess.cs).
 // They are internal or private, so a game update can rename them: ResolveAll lists what is missing and the mod then stays off, saying so.
 using System.Reflection;

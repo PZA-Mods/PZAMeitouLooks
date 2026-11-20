@@ -1,6 +1,6 @@
-// PZA's Looks for Meitou. Author: PZA. Licence: GPLv3 or later.
+// PZA's Post-FX for Meitou. Author: PZA. Licence: GPLv3 or later.
 // The named looks: the pixel-art effect values of the user's Dust presets of the same names (the pixel-art effect's ini in each Dust preset folder,
-// read 2026-11-17). The player picks a look by name; there are no sliders (the user's rule: ready-made presets, not slider explanations).
+// read 2026-11-17). The player picks a look by name; 0.4.0 adds sliders under each list (user 2026-11-19), which a preset fills (LookValues).
 // The Dust presets' other effects (Dust's LUT grade, bloom, outline, vignette...) are not ours: their Meitou counterparts are a Meitou look
 // preset file of the same name (presets\*.json, the port notes "Dust's own settings").
 namespace PZA.Looks.Meitou;
@@ -19,11 +19,16 @@ public sealed record PixelLook(
     float CrtSoft = 0,      // CrtSoftness
     float Bleed = 0,        // ColourBleed
     int Sampling = 0,       // Sampling: 0 centre, 1 cell average
-    float NativeLines = 0); // NativeResolution: 0 off, else the line count (1 = 240)
+    float NativeLines = 0,  // NativeResolution: 0 off, else the line count (240)
+    float Strength = 1,     // 0.4.0 sliders: mix with Meitou's picture
+    bool LiftNight = true,  // LiftNight (1 in every look)
+    bool KeepBlack = true); // KeepBlack (Desert 16's 17th colour; 1 in every look)
 
 public static class Looks
 {
     public const string Off = "Off";
+    /// <summary>0.4.0: the lists' last option: the sliders as the player set them.</summary>
+    public const string Custom = "Custom";
 
     /// <summary>Every look, in the order the Settings page lists them (after Off).</summary>
     public static readonly PixelLook[] All =
@@ -31,13 +36,18 @@ public static class Looks
         new("PZA Pixel - 1", 4.09f, 0, 6, 0.6f, 1.15f),
         new("PZA Pixel - 2", 2.5f, 0, 6, 0.6f, 1.15f),
         new("PZA Pixel - 3", 8.0f, 0, 6, 0.6f, 1.15f),
+        // 0.3.0 (parity with the Dust presets, user 2026-11-19): Pixel 1 for the night, the lift fades out in daylight (LiftNight)
+        new("PZA Pixel - 1 Night", 4.09f, 0, 6, 0.6f, 1.0f, ShadowLift: 0.6f),
         new("PZA - PS1 Main", 4.09f, 2, 8, 0.6f, 1.0f, HighlightHold: 0.5f, Scanlines: 0.6f, CrtSoft: 0.05f, Bleed: 0.4f),
+        new("PZA PS1 - Standard", 4.0f, 3, 16, 1.0f, 1.05f, ShadowLift: 0.012f, Scanlines: 0.35f, CrtSoft: 0.4f, Bleed: 0.3f),   // 0.3.0
         new("PZA PS1 - CRT", 4.0f, 3, 16, 0.04f, 1.05f, ShadowLift: 0.012f, Scanlines: 1f, CrtSoft: 0.385f, Bleed: 1f),
         new("PZA Soft 240 - Standard", 4.0f, 4, 16, 1.0f, 1.0f, CrtSoft: 0.35f, Sampling: 1, NativeLines: 240),
+        // 0.3.0: "PZA Diorama - Pixel"'s fine full-colour pixels (pairs with Tilt-Shift "PZA Diorama")
+        new("PZA Diorama - Pixel", 2.5f, 2, 16, 0f, 1.0f, HighlightHold: 0.5f, Sampling: 1),
     ];
 
     /// <summary>Off and every look's name: the Settings page's options.</summary>
-    public static readonly string[] Names = [Off, .. All.Select(l => l.Name)];
+    public static readonly string[] Names = [Off, .. All.Select(l => l.Name), Custom];
 
     /// <summary>The look of that name; null for Off or an unknown name.</summary>
     public static PixelLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
@@ -54,7 +64,9 @@ public sealed record TiltLook(
     float Top,           // TopAmount (the far side)
     float Bottom,        // BottomAmount (the near side)
     float Saturation,    // Saturation
-    float Contrast);     // Contrast
+    float Contrast,      // Contrast
+    float Upright = 1,   // 0.4.0 sliders: Upright (1 in every PZA preset)
+    float Strength = 1); // Strength
 
 public static class Tilts
 {
@@ -70,7 +82,55 @@ public static class Tilts
     ];
 
     /// <summary>Off and every Tilt-Shift's name: the Settings page's options.</summary>
-    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name)];
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
 
     public static TiltLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
+
+/// <summary>One Fisheye (0.3.0), from the Dust Fisheye effect's settings (keys in the comments).</summary>
+public sealed record FisheyeLook(
+    string Name,
+    int Fit,           // Fit: 0 Fill (the corners stay corners, no black), 1 Full width (round, black corners)
+    float Strength,    // Strength: 0 the normal lens .. 1 a full fisheye
+    float EdgeDark);   // EdgeDark: darkening toward the corners
+
+public static class Fisheyes
+{
+    /// <summary>Every Fisheye, in the Settings page's order (after Off). Dust's defaults: strength 1, edge darkening 0.25.</summary>
+    public static readonly FisheyeLook[] All =
+    [
+        new("PZA Fisheye", 0, 1f, 0.25f),
+        new("PZA Fisheye - Round", 1, 1f, 0.25f),
+    ];
+
+    /// <summary>Off and every Fisheye's name: the Settings page's options.</summary>
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
+
+    public static FisheyeLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
+
+/// <summary>0.4.0: one Outline, our own edge pass (the Dust Outline effect's settings as a guide; the maths is ours, OutlineShader).</summary>
+public sealed record OutlineLook(
+    string Name,
+    float Depth,       // depth sensitivity: the inverse-depth jump (share of the centre's) that starts a line; a line is full at 1.5x
+    float Normal,      // crease sensitivity: 1 - cos of the fold between neighbouring normals (0 = no crease lines)
+    int Thickness,     // tap distance in depth pixels (1..4)
+    float Strength,    // mix toward the colour
+    float Red, float Green, float Blue,
+    float MaxDepth);   // share of the view's far plane beyond which no line is drawn
+
+public static class Outlines
+{
+    /// <summary>Every Outline, in the Settings page's order (after Off).</summary>
+    public static readonly OutlineLook[] All =
+    [
+        new("PZA Outline", 0.003f, 0.8f, 1, 0.8f, 0f, 0f, 0f, 0.5f),
+        new("PZA Outline - Ink", 0.003f, 0.6f, 2, 1.0f, 0f, 0f, 0f, 0.3f),
+        new("PZA Outline - Soft", 0.003f, 0.8f, 1, 0.6f, 0f, 0f, 0f, 0.5f),
+        new("PZA Outline - Tilt-Shift", 0.005f, 0.7f, 1, 0.75f, 0f, 0f, 0f, 0.5f),
+    ];
+
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
+
+    public static OutlineLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
 }

@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- PZA's Looks for Meitou: the code mod (author PZA, GPLv3 or later). Built against MeitouClient 0.20.1 (gameVersion "=0.20.1").
+  <!-- PZA's Post-FX for Meitou: the code mod (author PZA, GPLv3 or later). Built against MeitouClient 0.20.1 (gameVersion "=0.20.1").
        The game supplies every Meitou assembly and 0Harmony at run time: they are referenced by path with Private="false" and never copied
        into git or the output. Override MeitouDir to build against another unpacked Meitou release. -->
   <PropertyGroup>
@@ -15,11 +15,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <Version>0.2.6</Version>
+    <Version>0.4.0</Version>
     
     <Authors>PZA</Authors>
     <Company>PZA</Company>
-    <Product>PZA's Looks for Meitou</Product>
+    <Product>PZA's Post-FX for Meitou</Product>
     <Copyright>PZA, GPLv3 or later</Copyright>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

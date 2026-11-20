@@ -1,4 +1,4 @@
-# PZA's Looks for Meitou: credits and notices
+# PZA's Post-FX for Meitou: credits and notices
 
 **Author:** PZA. **Licence:** GNU General Public License version 3 or later (`LICENSE`).
 Unofficial fan-made mod; not affiliated with Lo-Fi Games, the Meitou project or the Dust project.

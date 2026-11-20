@@ -1,4 +1,4 @@
-// PZA's Looks for Meitou. Author: PZA. Licence: GPLv3 or later.
+// PZA's Post-FX for Meitou. Author: PZA. Licence: GPLv3 or later.
 // PZA Tilt-Shift, ported from our Dust effect (pza_tiltshift_ps.hlsl, version 2.3) to GLSL 330 for Meitou.
 // Real tilt-shift from depth: the sharp zone is a PLANE in the world through the focus point, holding the camera's left-right axis; "upright"
 // tilts it from facing the camera (an ordinary lens) to standing straight up (the miniature look), so a character standing in the sharp zone
@@ -26,7 +26,8 @@ public static class TiltShader
         uniform vec2 uViewport, uPlanes;
         uniform float uStrength, uFocusCentre, uFocusWidth, uFalloff, uBlurPx, uTop, uBottom, uSaturation, uContrast;
         uniform vec3 uPlaneN;         // the plane's normal in view space (x right, y up, z forward)
-        uniform float uTanHalfFov, uAspect, uGroundGain, uPivotZ;   // uPivotZ: the focus point's view depth at the screen centre, 0 = none
+        uniform float uTanHalfFov, uAspect, uGroundGain, uPivotZ;   // uPivotZ: the focus point's view depth, 0 = none
+        uniform vec2 uPivotXY;        // 0.3.0: its view x / y (PZA's Camera's character point; 0, 0 = the screen centre)
         uniform int uFocusMode, uFlipY, uSplit, uDebug;
 
         const vec3 LUMA = vec3(0.299, 0.587, 0.114);
@@ -68,7 +69,7 @@ public static class TiltShader
         {
             if (uPivotZ > 0.0)
             {   // 2.3: the camera's own point (the screen centre at the pivot's distance)
-                vec3 p = vec3(0.0, 0.0, uPivotZ);
+                vec3 p = vec3(uPivotXY, uPivotZ);
                 s0 = dot(p, uPlaneN); H = 2.0 * uTanHalfFov * max(uPivotZ, 0.5);
                 return;
             }

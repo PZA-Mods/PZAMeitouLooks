@@ -1,13 +1,13 @@
-# PZA's Looks for Meitou: build
+# PZA's Post-FX for Meitou: build
 
 Author: PZA. Licence: GNU GPL version 3 or later (`LICENSE`).
 
-This is the source of PZA's Looks for Meitou 0.2.6 (beta, commit `9764383` of the development repository). Each release also carries a `-source.zip` with everything the DLL is built from, the shared code included.
+This is the source of PZA's Post-FX for Meitou 0.4.0 (beta, commit `c9f3cd6` of the development repository). Each release also carries a `-source.zip` with everything the DLL is built from, the shared code included.
 
 You need:
 - the .NET SDK (10 or newer)
 - an unpacked Meitou release (0.20.1 or newer, win-x64)
-- PZA's Meitou UI 0.3.1 beside this folder (`..\PZAMeitouUi\src`; its code is compiled in), also in the source zip
+- PZA's Meitou UI 0.3.2 beside this folder (`..\PZAMeitouUi\src`; its code is compiled in), also in the source zip
 
 Build (PowerShell):
 

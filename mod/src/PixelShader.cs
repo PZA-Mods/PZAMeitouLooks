@@ -1,4 +1,4 @@
-// PZA's Looks for Meitou. Author: PZA. Licence: GPLv3 or later.
+// PZA's Post-FX for Meitou. Author: PZA. Licence: GPLv3 or later.
 // The pixel-art look, ported from our Dust effect (pza_pixelart_ps.hlsl, HLSL) to the GLSL 330 Meitou's passes are written in
 // (MeitouClient PostProcessShaders: compiled by shaderc, run on Vulkan). Same maths, line for line: chunky pixels, a small palette, ordered
 // dither; the optional tone shaping (shadow lift faded by the frame's darkness, highlight hold) and the CRT section (scanlines, softness,
