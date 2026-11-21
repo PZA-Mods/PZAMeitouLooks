@@ -11,7 +11,8 @@ namespace PZA.Looks.Meitou;
 public static class LooksApi
 {
     /// <summary>Bumped when a member changes meaning; a caller checks it is at least the version it was written for.</summary>
-    public const int Version = 3;   // 2 (0.3.0): + FisheyeNames / Fisheye / SetFisheye; 3 (0.4.0): + OutlineNames / Outline / SetOutline,
+    public const int Version = 4;   // 4 (0.5.0): + Kuwahara / N64 / Toon names, getters and setters (Toon applies at the next start)
+    // 2 (0.3.0): + FisheyeNames / Fisheye / SetFisheye; 3 (0.4.0): + OutlineNames / Outline / SetOutline,
                                     // every list ends with "Custom" (the player's own slider values), and a preset set here fills its sliders
 
     /// <summary>Meitou's settings group for PZA's Post-FX (set by Initialize; null before, then changes go straight to the property).</summary>
@@ -52,6 +53,23 @@ public static class LooksApi
 
     /// <summary>Version 3: sets the Outline by name ("Off" turns it off); false (nothing changed) for an unknown name.</summary>
     public static bool SetOutline(string name) => Set(nameof(LooksSettings.Outline), name, Outlines.Names);
+
+    /// <summary>Version 4: Off, every Kuwahara's name and Custom.</summary>
+    public static string[] KuwaharaNames => [.. Kuwaharas.Names];
+    public static string Kuwahara => PixelPass.Settings.Kuwahara;
+    public static bool SetKuwahara(string name) => Set(nameof(LooksSettings.Kuwahara), name, Kuwaharas.Names);
+
+    /// <summary>Version 4: Off, every N64's name and Custom.</summary>
+    public static string[] N64Names => [.. N64s.Names];
+    public static string N64 => PixelPass.Settings.N64;
+    public static bool SetN64(string name) => Set(nameof(LooksSettings.N64), name, N64s.Names);
+
+    /// <summary>Version 4: Off, every Toon's name and Custom. A Toon set here is SAVED but drawn from the next start (it is baked into
+    /// Meitou's lighting shaders when they compile); <see cref="ToonRunning"/> is the one this game draws.</summary>
+    public static string[] ToonNames => [.. Toons.Names];
+    public static string Toon => PixelPass.Settings.Toon;
+    public static string ToonRunning => ToonPatch.Frozen?.Name ?? Looks.Off;
+    public static bool SetToon(string name) => Set(nameof(LooksSettings.Toon), name, Toons.Names);
 
     static bool Set(string key, string name, string[] allowed)
     {

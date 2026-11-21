@@ -151,6 +151,119 @@ public sealed class LooksSettings
     [Setting(Strings.En.OlMaxDepth, Hint = Strings.En.OlMaxDepthHint, Min = 0.01, Max = 1, Step = 0.01, SubGroup = Strings.En.OutlineGroup, VisibleWhen = nameof(OutlineOn))]
     public float OlMaxDepth { get; set; } = 0.5f;
 
+    // ---- Kuwahara (0.5.0) ----
+    /// <summary>0.5.0: PZA Kuwahara, the painted look (non-linear smoothing that keeps edges). Off = none.</summary>
+    [Setting(Strings.En.KuwaharaLabel, Hint = Strings.En.KuwaharaHint, Options = ["Off", "PZA Kuwahara - Default", "PZA Kuwahara - Painted Miniature",
+        "PZA Kuwahara - Soft", "PZA Kuwahara - Heavy", "Custom"])]
+    public string Kuwahara { get; set; } = "Off";
+
+    public bool KuwaharaOn => Kuwahara != Looks.Off;
+
+    [Setting(Strings.En.KwRadius, Hint = Strings.En.KwRadiusHint, Min = 1, Max = 8, Step = 0.5, SubGroup = Strings.En.KwGroup, VisibleWhen = nameof(KuwaharaOn))]
+    public float KwRadius { get; set; } = 5f;
+
+    [Setting(Strings.En.KwSharpness, Hint = Strings.En.KwSharpnessHint, Min = 1, Max = 16, Step = 0.5, SubGroup = Strings.En.KwGroup, VisibleWhen = nameof(KuwaharaOn))]
+    public float KwSharpness { get; set; } = 10f;
+
+    [Setting(Strings.En.Strength, Hint = Strings.En.KwStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.KwGroup, VisibleWhen = nameof(KuwaharaOn))]
+    public float KwStrength { get; set; } = 1f;
+
+    // ---- N64 (0.5.0) ----
+    /// <summary>0.5.0: PZA N64, fog in the scene's own colour and colour strength. Off = none.</summary>
+    [Setting(Strings.En.N64Label, Hint = Strings.En.N64Hint, Options = ["Off", "PZA N64 - Default", "PZA N64 - Soft 240", "Custom"])]
+    public string N64 { get; set; } = "Off";
+
+    public bool N64On => N64 != Looks.Off;
+
+    [Setting(Strings.En.NfFogStart, Hint = Strings.En.NfFogStartHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NfGroup, VisibleWhen = nameof(N64On))]
+    public float NfFogStart { get; set; } = 0.01f;
+
+    [Setting(Strings.En.NfFogEnd, Hint = Strings.En.NfFogEndHint, Min = 0.01, Max = 1, Step = 0.01, SubGroup = Strings.En.NfGroup, VisibleWhen = nameof(N64On))]
+    public float NfFogEnd { get; set; } = 0.12f;
+
+    [Setting(Strings.En.NfFogAmount, Hint = Strings.En.NfFogAmountHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NfGroup, VisibleWhen = nameof(N64On))]
+    public float NfFogAmount { get; set; } = 0.65f;
+
+    [Setting(Strings.En.NfFogSky, Hint = Strings.En.NfFogSkyHint, SubGroup = Strings.En.NfGroup, VisibleWhen = nameof(N64On))]
+    public bool NfFogSky { get; set; }
+
+    [Setting(Strings.En.NfTintR, Hint = Strings.En.NfTintHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NfGroup, VisibleWhen = nameof(N64On))]
+    public float NfTintR { get; set; } = 1f;
+
+    [Setting(Strings.En.NfTintG, Hint = Strings.En.NfTintHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NfGroup, VisibleWhen = nameof(N64On))]
+    public float NfTintG { get; set; } = 0.96f;
+
+    [Setting(Strings.En.NfTintB, Hint = Strings.En.NfTintHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NfGroup, VisibleWhen = nameof(N64On))]
+    public float NfTintB { get; set; } = 0.9f;
+
+    [Setting(Strings.En.NfSaturation, Hint = Strings.En.NfSaturationHint, Min = 0, Max = 2, Step = 0.01, SubGroup = Strings.En.NfGroup, VisibleWhen = nameof(N64On))]
+    public float NfSaturation { get; set; } = 1.15f;
+
+    [Setting(Strings.En.Strength, Hint = Strings.En.NfStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NfGroup, VisibleWhen = nameof(N64On))]
+    public float NfStrength { get; set; } = 1f;
+
+    // ---- Toon (0.5.0) ----
+    /// <summary>0.5.0: PZA Toon, the light banded inside Meitou's lighting (ToonPatch). Frozen at the game's start. Off = none.</summary>
+    [Setting(Strings.En.ToonLabel, Hint = Strings.En.ToonHint, Options = ["Off", "PZA Toon - Default", "PZA Toon - Kenshi", "PZA Toon - 1", "PZA Toon - Kenshi 3-Band",
+        "PZA Toon - Cel", "PZA Toon - Anime", "PZA Toon - Wind Waker", "PZA PS1 - Toon", "Custom"])]
+    public string Toon { get; set; } = "Off";
+
+    public bool ToonOn => Toon != Looks.Off;
+
+    [Setting(Strings.En.Strength, Hint = Strings.En.TnStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnStrength { get; set; } = 1f;
+
+    [Setting(Strings.En.TnAutoLight, Hint = Strings.En.TnAutoLightHint, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public bool TnAutoLight { get; set; } = true;
+
+    [Setting(Strings.En.TnLightRef, Hint = Strings.En.TnLightRefHint, Min = 0.1, Max = 4, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnLightRef { get; set; } = 1f;
+
+    [Setting(Strings.En.TnShadowEdge, Hint = Strings.En.TnShadowEdgeHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnShadowEdge { get; set; } = 0.45f;
+
+    [Setting(Strings.En.TnHighEdge, Hint = Strings.En.TnHighEdgeHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnHighEdge { get; set; } = 0.75f;
+
+    [Setting(Strings.En.TnSoftness, Hint = Strings.En.TnSoftnessHint, Min = 0, Max = 0.25, Step = 0.001, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnSoftness { get; set; } = 0.008f;
+
+    [Setting(Strings.En.TnShadowLevel, Hint = Strings.En.TnLevelHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnShadowLevel { get; set; } = 0.22f;
+
+    [Setting(Strings.En.TnMidLevel, Hint = Strings.En.TnLevelHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnMidLevel { get; set; } = 0.5f;
+
+    [Setting(Strings.En.TnLitLevel, Hint = Strings.En.TnLevelHint, Min = 0.05, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnLitLevel { get; set; } = 0.75f;
+
+    [Setting(Strings.En.TnTintR, Hint = Strings.En.TnTintHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnTintR { get; set; } = 0.72f;
+
+    [Setting(Strings.En.TnTintG, Hint = Strings.En.TnTintHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnTintG { get; set; } = 0.6f;
+
+    [Setting(Strings.En.TnTintB, Hint = Strings.En.TnTintHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnTintB { get; set; } = 0.8f;
+
+    [Setting(Strings.En.TnTintAmount, Hint = Strings.En.TnTintAmountHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnTintAmount { get; set; } = 0.7f;
+
+    [Setting(Strings.En.TnRim, Hint = Strings.En.TnRimHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnRim { get; set; } = 0.35f;
+
+    [Setting(Strings.En.TnRimR, Hint = Strings.En.TnRimColourHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnRimR { get; set; } = 1f;
+
+    [Setting(Strings.En.TnRimG, Hint = Strings.En.TnRimColourHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnRimG { get; set; } = 0.8f;
+
+    [Setting(Strings.En.TnRimB, Hint = Strings.En.TnRimColourHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnRimB { get; set; } = 0.55f;
+
+    [Setting(Strings.En.TnSaturation, Hint = Strings.En.TnSaturationHint, Min = 0, Max = 2, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
+    public float TnSaturation { get; set; } = 1.15f;
+
     // ---- Compare ---------------------------------------------------------------------------------------------------------------------------
     /// <summary>Compare: the left half of the screen as Meitou draws it, the right half with the look.</summary>
     [Setting(Strings.En.SplitLabel, Hint = Strings.En.SplitHint)]
@@ -169,6 +282,64 @@ static class Strings
         public const string FisheyeHint = "Bends the view like a fisheye lens. Fisheye fills the whole screen; Round shows everything across with black corners, like a real round fisheye. Pairs with PZA's Camera's 0.5x lens.";
         public const string OutlineLabel = "Outline";
         public const string OutlineHint = "Draws lines round characters, buildings and creases from the scene's depth, like ink on a drawing. Ink = thick and dark, Soft = faint, Tilt-Shift = for use with Tilt-Shift. Picking one fills the Outline sliders below.";
+        public const string KuwaharaLabel = "Kuwahara";
+        public const string KuwaharaHint = "A painted look: smooths areas into strokes while keeping edges sharp (non-linear smoothing). Default = plain strokes; Painted Miniature = the Dust preset; Heavy = big strokes (costs more). Picking one fills the Kuwahara sliders below.";
+        public const string KwGroup = "Kuwahara";
+        public const string KwRadius = "Brush size";
+        public const string KwRadiusHint = "How big the strokes are, in pixels at 1080 lines.";
+        public const string KwSharpness = "Edge keeping";
+        public const string KwSharpnessHint = "How firmly edges stay sharp (higher = crisper edges, flatter areas).";
+        public const string KwStrengthHint = "Mixes the painted picture with Meitou's (1 = fully painted).";
+        public const string N64Label = "N64";
+        public const string N64Hint = "The Nintendo 64's short draw distance: far things fade into fog in the scene's own colour, and colours get a little stronger. Default = fog you see in ordinary views, sky clear; Soft 240 = the Dust preset. Picking one fills the N64 sliders below.";
+        public const string NfGroup = "N64";
+        public const string NfFogStart = "Fog start";
+        public const string NfFogStartHint = "Where the fog begins (0 = at the camera, 1 = the far horizon).";
+        public const string NfFogEnd = "Fog end";
+        public const string NfFogEndHint = "Where the fog is full (0 = at the camera, 1 = the far horizon).";
+        public const string NfFogAmount = "Fog amount";
+        public const string NfFogAmountHint = "How thick the fog is at its end (1 = the fog colour alone).";
+        public const string NfFogSky = "Fog the sky";
+        public const string NfFogSkyHint = "The sky takes the fog too (the N64 look), or keeps its own colour.";
+        public const string NfTintR = "Fog red";
+        public const string NfTintG = "Fog green";
+        public const string NfTintB = "Fog blue";
+        public const string NfTintHint = "Tints the fog (1, 1, 1 = the scene's own average colour).";
+        public const string NfSaturation = "Colour strength";
+        public const string NfSaturationHint = "Saturation (1 = unchanged).";
+        public const string NfStrengthHint = "Mixes the N64 look with Meitou's picture (1 = the full look).";
+        public const string ToonLabel = "Toon (applies at the next start)";
+        public const string ToonHint = "Cartoon lighting: the light falls into a few flat bands with a tinted shadow and a rim, inside Meitou's own lighting, so the bands follow the light and never the textures, characters included. Changes apply at the NEXT START of the game. Default = plain bands; Kenshi = the Dust preset.";
+        public const string TnGroup = "Toon (next start)";
+        public const string TnStrengthHint = "Mixes the toon light with Meitou's (1 = full toon).";
+        public const string TnAutoLight = "Follow the sun";
+        public const string TnAutoLightHint = "The bands follow the sun's own strength, so dawn and noon both band well (off: a fixed light reference).";
+        public const string TnLightRef = "Light reference";
+        public const string TnLightRefHint = "The light that counts as full, when Follow the sun is off.";
+        public const string TnShadowEdge = "Shadow edge";
+        public const string TnShadowEdgeHint = "Below this share of the full light, a surface is in the shadow band.";
+        public const string TnHighEdge = "Highlight edge";
+        public const string TnHighEdgeHint = "Above this share of the full light, a surface is in the lit band.";
+        public const string TnSoftness = "Band softness";
+        public const string TnSoftnessHint = "How soft the steps between bands are (0 = hard cel edges).";
+        public const string TnShadowLevel = "Shadow level";
+        public const string TnMidLevel = "Mid level";
+        public const string TnLitLevel = "Lit level";
+        public const string TnLevelHint = "The brightness of that band (the lit level is the full light).";
+        public const string TnTintR = "Shadow red";
+        public const string TnTintG = "Shadow green";
+        public const string TnTintB = "Shadow blue";
+        public const string TnTintHint = "The shadow band's tint colour.";
+        public const string TnTintAmount = "Shadow tint";
+        public const string TnTintAmountHint = "How much the shadow band takes the tint.";
+        public const string TnRim = "Rim light";
+        public const string TnRimHint = "A light along silhouettes, like a cartoon's rim.";
+        public const string TnRimR = "Rim red";
+        public const string TnRimG = "Rim green";
+        public const string TnRimB = "Rim blue";
+        public const string TnRimColourHint = "The rim light's colour.";
+        public const string TnSaturation = "Colour strength";
+        public const string TnSaturationHint = "Saturation of the surfaces' own colours (1 = unchanged).";
         public const string SplitLabel = "Compare (left half without)";
         public const string SplitHint = "Shows the left half of the screen without the looks, for a before / after.";
 

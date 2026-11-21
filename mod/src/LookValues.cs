@@ -22,8 +22,15 @@ public static class LookValues
         "Ts" => nameof(LooksSettings.TiltShift),
         "Fe" => nameof(LooksSettings.Fisheye),
         "Ol" => nameof(LooksSettings.Outline),
+        "Kw" => nameof(LooksSettings.Kuwahara),   // 0.5.0
+        "Nf" => nameof(LooksSettings.N64),
+        "Tn" => nameof(LooksSettings.Toon),
         _ => null,
     };
+
+    /// <summary>Every effect's preset list, in the Settings page's order.</summary>
+    public static readonly string[] Lists = [nameof(LooksSettings.Look), nameof(LooksSettings.TiltShift), nameof(LooksSettings.Fisheye),
+        nameof(LooksSettings.Outline), nameof(LooksSettings.Kuwahara), nameof(LooksSettings.N64), nameof(LooksSettings.Toon)];
 
     [ThreadStatic] static bool t_applying;
 
@@ -37,7 +44,7 @@ public static class LookValues
 
     public static void ApplyAll(ModSettingsGroup? group, LooksSettings s)
     {
-        foreach (var list in new[] { nameof(LooksSettings.Look), nameof(LooksSettings.TiltShift), nameof(LooksSettings.Fisheye), nameof(LooksSettings.Outline) })
+        foreach (var list in Lists)
             ApplyPreset(group, s, list);
     }
 
@@ -115,6 +122,51 @@ public static class LookValues
                     Set(group, s, nameof(s.OlMaxDepth), o.MaxDepth);
                 });
                 break;
+            case nameof(LooksSettings.Kuwahara) when Kuwaharas.Find(s.Kuwahara) is { } k:
+                Run(() =>
+                {
+                    Set(group, s, nameof(s.KwRadius), k.Radius);
+                    Set(group, s, nameof(s.KwSharpness), k.Sharpness);
+                    Set(group, s, nameof(s.KwStrength), k.Strength);
+                });
+                break;
+            case nameof(LooksSettings.N64) when N64s.Find(s.N64) is { } f:
+                Run(() =>
+                {
+                    Set(group, s, nameof(s.NfFogStart), f.FogStart);
+                    Set(group, s, nameof(s.NfFogEnd), f.FogEnd);
+                    Set(group, s, nameof(s.NfFogAmount), f.FogAmount);
+                    Set(group, s, nameof(s.NfFogSky), f.FogSky);
+                    Set(group, s, nameof(s.NfTintR), f.TintR);
+                    Set(group, s, nameof(s.NfTintG), f.TintG);
+                    Set(group, s, nameof(s.NfTintB), f.TintB);
+                    Set(group, s, nameof(s.NfSaturation), f.Saturation);
+                    Set(group, s, nameof(s.NfStrength), f.Strength);
+                });
+                break;
+            case nameof(LooksSettings.Toon) when Toons.Find(s.Toon) is { } t:
+                Run(() =>
+                {
+                    Set(group, s, nameof(s.TnStrength), t.Strength);
+                    Set(group, s, nameof(s.TnAutoLight), t.AutoLight);
+                    Set(group, s, nameof(s.TnLightRef), t.LightRef);
+                    Set(group, s, nameof(s.TnShadowEdge), t.ShadowEdge);
+                    Set(group, s, nameof(s.TnHighEdge), t.HighlightEdge);
+                    Set(group, s, nameof(s.TnSoftness), t.Softness);
+                    Set(group, s, nameof(s.TnShadowLevel), t.ShadowLevel);
+                    Set(group, s, nameof(s.TnMidLevel), t.MidLevel);
+                    Set(group, s, nameof(s.TnLitLevel), t.LitLevel);
+                    Set(group, s, nameof(s.TnTintR), t.TintR);
+                    Set(group, s, nameof(s.TnTintG), t.TintG);
+                    Set(group, s, nameof(s.TnTintB), t.TintB);
+                    Set(group, s, nameof(s.TnTintAmount), t.TintAmount);
+                    Set(group, s, nameof(s.TnRim), t.Rim);
+                    Set(group, s, nameof(s.TnRimR), t.RimR);
+                    Set(group, s, nameof(s.TnRimG), t.RimG);
+                    Set(group, s, nameof(s.TnRimB), t.RimB);
+                    Set(group, s, nameof(s.TnSaturation), t.Saturation);
+                });
+                break;
         }
     }
 
@@ -188,4 +240,37 @@ public static class LookValues
         F(s.OlStrength, 0, 1, 0.8f),
         F(s.OlRed, 0, 1, 0), F(s.OlGreen, 0, 1, 0), F(s.OlBlue, 0, 1, 0),
         F(s.OlMaxDepth, 0.01f, 1, 0.5f));
+
+    public static KuwaharaLook? Kuwahara(LooksSettings s) => s.Kuwahara == Looks.Off || !Kuwaharas.Names.Contains(s.Kuwahara) ? null : new(
+        s.Kuwahara,
+        F(s.KwRadius, 1, 8, 3),
+        F(s.KwSharpness, 1, 16, 8),
+        F(s.KwStrength, 0, 1, 0.8f));
+
+    public static N64Look? N64(LooksSettings s) => s.N64 == Looks.Off || !N64s.Names.Contains(s.N64) ? null : new(
+        s.N64,
+        F(s.NfFogStart, 0, 1, 0.04f),
+        F(s.NfFogEnd, 0.01f, 1, 0.3f),
+        F(s.NfFogAmount, 0, 1, 0.6f),
+        F(s.NfTintR, 0, 1, 1), F(s.NfTintG, 0, 1, 0.96f), F(s.NfTintB, 0, 1, 0.9f),
+        F(s.NfSaturation, 0, 2, 1.15f),
+        F(s.NfStrength, 0, 1, 1),
+        s.NfFogSky);
+
+    public static ToonLook? Toon(LooksSettings s) => s.Toon == Looks.Off || !Toons.Names.Contains(s.Toon) ? null : new(
+        s.Toon,
+        F(s.TnStrength, 0, 1, 1),
+        s.TnAutoLight,
+        F(s.TnLightRef, 0.1f, 4, 1),
+        F(s.TnShadowEdge, 0, 1, 0.4f),
+        F(s.TnHighEdge, 0, 1, 0.68f),
+        F(s.TnSoftness, 0, 0.25f, 0.03f),
+        F(s.TnShadowLevel, 0, 1, 0.3f),
+        F(s.TnMidLevel, 0, 1, 0.5f),
+        F(s.TnLitLevel, 0.05f, 1, 0.68f),
+        F(s.TnTintR, 0, 1, 0.72f), F(s.TnTintG, 0, 1, 0.6f), F(s.TnTintB, 0, 1, 0.8f),
+        F(s.TnTintAmount, 0, 1, 0.6f),
+        F(s.TnRim, 0, 1, 0.25f),
+        F(s.TnRimR, 0, 1, 1), F(s.TnRimG, 0, 1, 0.8f), F(s.TnRimB, 0, 1, 0.55f),
+        F(s.TnSaturation, 0, 2, 1.1f));
 }

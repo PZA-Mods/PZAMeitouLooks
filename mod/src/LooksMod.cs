@@ -29,7 +29,11 @@ public sealed class LooksMod : IMod
         string version = typeof(LooksMod).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "?";
         int plus = version.IndexOf('+');
         if (plus >= 0) version = version[..plus];
-        Log.Line($"{version} for Meitou, by PZA: look '{PixelPass.Settings.Look}', Tilt-Shift '{PixelPass.Settings.TiltShift}', Fisheye '{PixelPass.Settings.Fisheye}', Outline '{PixelPass.Settings.Outline}' (Settings > Mods)");
+        Log.Line($"{version} for Meitou, by PZA: look '{PixelPass.Settings.Look}', Tilt-Shift '{PixelPass.Settings.TiltShift}', Fisheye '{PixelPass.Settings.Fisheye}', Outline '{PixelPass.Settings.Outline}', Kuwahara '{PixelPass.Settings.Kuwahara}', N64 '{PixelPass.Settings.N64}', "
+            + $"Toon '{PixelPass.Settings.Toon}' (Settings > Mods)");
+        // 0.5.0: Toon lives in Meitou's lighting shaders, which compile once: frozen now for this game (a change applies at the next start)
+        try { Log.Line(ToonPatch.Apply(context.Harmony, LookValues.Toon(PixelPass.Settings))); }
+        catch (Exception e) { Log.Line("toon: stays OFF: patching failed (" + e.GetType().Name + ": " + e.Message + ")"); }
         Start(context.Harmony);
     }
 
@@ -69,6 +73,16 @@ public sealed class LooksMod : IMod
             if (outline == Looks.Off || Outlines.Find(outline) is not null) PixelPass.Settings.Outline = outline;
             LookValues.ApplyPreset(null, PixelPass.Settings, nameof(LooksSettings.Outline));
             Log.Line($"PZA_LOOKS_OUTLINE={outline}: Outline for this run '{PixelPass.Settings.Outline}'");
+        }
+        // 0.5.0: Kuwahara, N64, Toon by name for this run (as PZA_LOOKS_OUTLINE)
+        foreach (var (env, list, names) in new[] { ("PZA_LOOKS_KUWAHARA", nameof(LooksSettings.Kuwahara), Kuwaharas.Names),
+                     ("PZA_LOOKS_N64", nameof(LooksSettings.N64), N64s.Names), ("PZA_LOOKS_TOON", nameof(LooksSettings.Toon), Toons.Names) })
+        {
+            if (Environment.GetEnvironmentVariable(env) is not { Length: > 0 } pick) continue;
+            var prop = typeof(LooksSettings).GetProperty(list)!;
+            if (names.Contains(pick, StringComparer.Ordinal) && pick != Looks.Custom) prop.SetValue(PixelPass.Settings, pick);
+            LookValues.ApplyPreset(null, PixelPass.Settings, list);
+            Log.Line($"{env}={pick}: {list} for this run '{prop.GetValue(PixelPass.Settings)}'");
         }
         // PZA_LOOKS_SET="PxSize=6;OlThickness=2": any slider for this run (screenshots of a Custom look), by key; logged, never kept
         if (Environment.GetEnvironmentVariable("PZA_LOOKS_SET") is { Length: > 0 } sets)

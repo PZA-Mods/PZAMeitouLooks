@@ -27,6 +27,8 @@ static class PixelPass
     static TiltLook? s_frameTilt;
     static FisheyeLook? s_frameFish;
     static OutlineLook? s_frameLine;
+    static KuwaharaLook? s_frameKw;
+    static N64Look? s_frameN64;
     static bool s_failed, s_hdrLogged;
     static string? s_lastChoice;
     public static int FramesDrawn { get; private set; }
@@ -46,14 +48,17 @@ static class PixelPass
     {
         __state = null;
         (s_frameLook, s_frameTilt, s_frameFish, s_frameLine) = (null, null, null, null);
+        (s_frameKw, s_frameN64) = (null, null);
         if (s_failed) return;
         // 0.4.0: the sliders' values (a preset filled them; Custom = the player's own)
         var look = LookValues.Pixel(Settings);
         var tilt = LookValues.Tilt(Settings);
         var fish = LookValues.Fisheye(Settings);
         var line = LookValues.Outline(Settings);
-        LogChoice(look, tilt, fish, line);
-        if (look is null && tilt is null && fish is null && line is null) return;
+        var kw = LookValues.Kuwahara(Settings);   // 0.5.0
+        var n64 = LookValues.N64(Settings);
+        LogChoice(look, tilt, fish, line, kw, n64);
+        if (look is null && tilt is null && fish is null && line is null && kw is null && n64 is null) return;
         try
         {
             if (__instance.Options.HdrPeak > 1)
@@ -64,12 +69,14 @@ static class PixelPass
             }
             var (w, h) = Access.DisplaySize(__instance);
             if (w <= 0 || h <= 0) return;
-            if (!TiltPass.Ready(__instance)) (tilt, line) = (null, null);   // no depth yet (first frames): the others alone
-            if (look is null && tilt is null && fish is null && line is null) return;
-            int passes = (look is null ? 0 : 1) + (tilt is null ? 0 : 1) + (fish is null ? 0 : 1) + (line is null ? 0 : 1);
+            if (!TiltPass.Ready(__instance)) (tilt, line, n64) = (null, null, null);   // no depth yet (first frames): the others alone
+            if (look is null && tilt is null && fish is null && line is null && kw is null && n64 is null) return;
+            int passes = (look is null ? 0 : 1) + (tilt is null ? 0 : 1) + (fish is null ? 0 : 1) + (line is null ? 0 : 1)
+                + (kw is null ? 0 : 1) + (n64 is null ? 0 : 1);
             Ensure(__instance, w, h, passes >= 2);
             __state = final;
             (s_frameLook, s_frameTilt, s_frameFish, s_frameLine) = (look, tilt, fish, line);
+            (s_frameKw, s_frameN64) = (kw, n64);
             final = PassTargets.Of(Access.TextureOf(s_a!), null);
         }
         catch (Exception e)
@@ -86,8 +93,13 @@ static class PixelPass
         {
             // 0.3.0: Tilt-Shift, Fisheye, the look, in Dust's order; each reads the last one's picture (A, B, A...) and the last draws the frame.
             // 0.4.0: the Outline first (Dust: Outline at POST_LIGHTING 50, before them all), on the picture its depth belongs to
-            var steps = new List<(LegacyProgram P, Action<object> Set, string Stamp)>(4);
+            // 0.5.0: N64's fog (on the scene, with its depth), then Kuwahara's paint, then the Outline drawn over the paint
+            var steps = new List<(LegacyProgram P, Action<object> Set, string Stamp)>(6);
             var size = (s_width, s_height);
+            if (s_frameN64 is { } n64)
+                steps.Add((N64Pass.Program!, src => N64Pass.Set(__instance, n64, src, Settings.Split), "pza n64"));
+            if (s_frameKw is { } kw)
+                steps.Add((KuwaharaPass.Program!, src => KuwaharaPass.Set(__instance, kw, src, size, Settings.Split), "pza kuwahara"));
             if (s_frameLine is { } line)
                 steps.Add((OutlinePass.Program!, src => OutlinePass.Set(__instance, line, src, Settings.Split, OutlineMask), "pza outline"));
             if (s_frameTilt is { } tilt)
@@ -111,7 +123,8 @@ static class PixelPass
             }
             if (FramesDrawn++ == 0)
                 Log.Line($"first frame drawn: look '{s_frameLook?.Name ?? Looks.Off}', Tilt-Shift '{s_frameTilt?.Name ?? Looks.Off}', "
-                    + $"Fisheye '{s_frameFish?.Name ?? Looks.Off}', Outline '{s_frameLine?.Name ?? Looks.Off}' at {s_width}x{s_height}");
+                    + $"Fisheye '{s_frameFish?.Name ?? Looks.Off}', Outline '{s_frameLine?.Name ?? Looks.Off}', Kuwahara '{s_frameKw?.Name ?? Looks.Off}', "
+                    + $"N64 '{s_frameN64?.Name ?? Looks.Off}' at {s_width}x{s_height}");
         }
         catch (Exception e)
         {
@@ -126,6 +139,8 @@ static class PixelPass
         TiltPass.Ensure(pp);
         FisheyePass.Ensure(pp);
         OutlinePass.Ensure(pp);
+        KuwaharaPass.Ensure(pp);
+        N64Pass.Ensure(pp);
         if (s_a is not null && (s_width != w || s_height != h))
         {
             Access.TextureOf(s_a).Dispose();
@@ -137,11 +152,11 @@ static class PixelPass
         (s_width, s_height) = (w, h);
     }
 
-    static void LogChoice(PixelLook? look, TiltLook? tilt, FisheyeLook? fish, OutlineLook? line)
+    static void LogChoice(PixelLook? look, TiltLook? tilt, FisheyeLook? fish, OutlineLook? line, KuwaharaLook? kw, N64Look? n64)
     {
         // the names only (a slider dragged on the Settings page would log every step otherwise)
         string choice = $"look '{look?.Name ?? Looks.Off}', Tilt-Shift '{tilt?.Name ?? Looks.Off}', Fisheye '{fish?.Name ?? Looks.Off}', "
-            + $"Outline '{line?.Name ?? Looks.Off}'";
+            + $"Outline '{line?.Name ?? Looks.Off}', Kuwahara '{kw?.Name ?? Looks.Off}', N64 '{n64?.Name ?? Looks.Off}'";
         if (choice == s_lastChoice) return;
         s_lastChoice = choice;
         Log.Line(choice);
@@ -413,6 +428,77 @@ static class OutlinePass
         {
             s_logged = true;
             Log.Line($"outline: depth {o.Depth}, crease {o.Normal}, {o.Thickness} px, strength {o.Strength}, up to {o.MaxDepth:0.00} of the far plane, planes {Access.Planes(pp)}");
+        }
+    }
+}
+
+/// <summary>0.5.0: PZA Kuwahara (KuwaharaShader), the painted look.</summary>
+static class KuwaharaPass
+{
+    public static LegacyProgram? Program;
+    static SamplerSlot s_image;
+    static UniformHandle s_viewport, s_radius, s_sharpness, s_strength, s_split;
+
+    public static void Ensure(PostProcess pp)
+    {
+        if (Program is not null) return;
+        var p = Program = LegacyProgram.Create(pp.Gpu, Access.Vertex!, KuwaharaShader.Fragment, "pza looks kuwahara");
+        s_image = p.Sampler("uImage");
+        (s_viewport, s_radius, s_sharpness, s_strength, s_split) = (p.Uniform("uViewport"), p.Uniform("uRadius"), p.Uniform("uSharpness"),
+            p.Uniform("uStrength"), p.Uniform("uSplit"));
+        Log.Line("kuwahara program compiled");
+    }
+
+    public static void Set(PostProcess pp, KuwaharaLook k, object source, (int W, int H) size, bool split)
+    {
+        var p = Program!;
+        Access.Bind(pp, p, s_image, source);
+        p.Set(s_viewport, size.W, (float)size.H);
+        p.Set(s_radius, k.Radius);
+        p.Set(s_sharpness, k.Sharpness);
+        p.Set(s_strength, k.Strength);
+        p.Set(s_split, split ? 1 : 0);
+    }
+}
+
+/// <summary>0.5.0: PZA N64 (N64Shader), fog in the scene's own colour.</summary>
+static class N64Pass
+{
+    public static LegacyProgram? Program;
+    static SamplerSlot s_image, s_depth;
+    static UniformHandle s_planes, s_start, s_end, s_amount, s_saturation, s_strength, s_tint, s_sky, s_split;
+    static bool s_logged;
+
+    public static void Ensure(PostProcess pp)
+    {
+        if (Program is not null) return;
+        var p = Program = LegacyProgram.Create(pp.Gpu, Access.Vertex!, N64Shader.Fragment(global::Meitou.Game.Rendering.Frame.DepthConvention.Glsl),
+            "pza looks n64");
+        (s_image, s_depth) = (p.Sampler("uImage"), p.Sampler("uDepth"));
+        (s_planes, s_start, s_end, s_amount, s_saturation, s_strength) = (p.Uniform("uPlanes"), p.Uniform("uFogStart"), p.Uniform("uFogEnd"),
+            p.Uniform("uFogAmount"), p.Uniform("uSaturation"), p.Uniform("uStrength"));
+        (s_tint, s_sky, s_split) = (p.Uniform("uTint"), p.Uniform("uFogSky"), p.Uniform("uSplit"));
+        Log.Line("n64 program compiled");
+    }
+
+    public static void Set(PostProcess pp, N64Look f, object source, bool split)
+    {
+        var p = Program!;
+        Access.Bind(pp, p, s_image, source);
+        Access.Bind(pp, p, s_depth, Access.DepthTarget(pp)!);
+        p.Set(s_planes, Access.Planes(pp));
+        p.Set(s_start, f.FogStart * N64s.FarClip);
+        p.Set(s_end, f.FogEnd * N64s.FarClip);
+        p.Set(s_amount, f.FogAmount);
+        p.Set(s_saturation, f.Saturation);
+        p.Set(s_strength, f.Strength);
+        p.Set(s_tint, new System.Numerics.Vector3(f.TintR, f.TintG, f.TintB));
+        p.Set(s_sky, f.FogSky ? 1 : 0);
+        p.Set(s_split, split ? 1 : 0);
+        if (!s_logged)
+        {
+            s_logged = true;
+            Log.Line($"n64: fog {f.FogStart * N64s.FarClip:0} to {f.FogEnd * N64s.FarClip:0} units, amount {f.FogAmount}, planes {Access.Planes(pp)}");
         }
     }
 }

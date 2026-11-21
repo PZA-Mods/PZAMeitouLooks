@@ -134,3 +134,97 @@ public static class Outlines
 
     public static OutlineLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
 }
+
+/// <summary>0.5.0: one Kuwahara (our own generalized Kuwahara: 8 soft sectors, the calmest wins), from the Dust Kuwahara effect's settings.</summary>
+public sealed record KuwaharaLook(
+    string Name,
+    float Radius,      // Radius (pixels at 1080 rows, scaled with the height)
+    float Sharpness,   // Sharpness (how strongly the calmest sector wins)
+    float Strength);   // Strength (mix with the picture)
+
+public static class Kuwaharas
+{
+    /// <summary>Every Kuwahara, in the Settings page's order (after Off). Default = tuned to show the paint plainly (user 2026-11-20:
+    /// "tune them"); Painted Miniature = the Dust preset "PZA Combo - Painted Miniature"'s Kuwahara, unchanged.</summary>
+    public static readonly KuwaharaLook[] All =
+    [
+        new("PZA Kuwahara - Default", 5f, 10f, 1f),
+        new("PZA Kuwahara - Painted Miniature", 3f, 8f, 0.8f),
+        new("PZA Kuwahara - Soft", 2f, 6f, 0.6f),
+        new("PZA Kuwahara - Heavy", 8f, 12f, 1f),
+    ];
+
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
+
+    public static KuwaharaLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
+
+/// <summary>0.5.0: one N64 (fog in the scene's own colour, and colour strength), from the Dust PZA N64 effect's settings. Fog distances are
+/// shares of Kenshi's own far clip (55,000 units), as in Dust; texture blur and smoothed light are not in (they need the engine).</summary>
+public sealed record N64Look(
+    string Name,
+    float FogStart,    // FogStart (share of the far clip)
+    float FogEnd,      // FogEnd
+    float FogAmount,   // FogAmount
+    float TintR, float TintG, float TintB,   // FogTint
+    float Saturation,  // Saturation
+    float Strength,    // Strength
+    bool FogSky = true);
+
+public static class N64s
+{
+    public const float FarClip = 55000f;
+
+    /// <summary>Every N64, in the Settings page's order (after Off). Default = tuned so the fog shows in ordinary views and the sky stays
+    /// clear (user 2026-11-20: "tune them"); Soft 240 = the Dust preset "PZA Combo - Soft 240 Toon"'s PZA N64, unchanged.</summary>
+    public static readonly N64Look[] All =
+    [
+        new("PZA N64 - Default", 0.01f, 0.12f, 0.65f, 1f, 0.96f, 0.9f, 1.15f, 1f, FogSky: false),
+        new("PZA N64 - Soft 240", 0.04f, 0.3f, 0.6f, 1f, 0.96f, 0.9f, 1.15f, 1f),
+    ];
+
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
+
+    public static N64Look? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
+
+/// <summary>0.5.0: one Toon (the light banded where Meitou computes it, ToonPatch), from the user's Dust PZA Toon presets (PZAToon.ini). The
+/// light is split at two edges into three levels (shadow, mid, lit); the shadow band takes a tint; a rim lights the silhouette. Flatten is
+/// not in (it needs the texture's neighbours, which Meitou's lighting does not see).</summary>
+public sealed record ToonLook(
+    string Name,
+    float Strength,       // Strength
+    bool AutoLight,       // AutoLight: the bands follow the sun's own strength (else LightRef)
+    float LightRef,       // LightRef
+    float ShadowEdge,     // ShadowEdge
+    float HighlightEdge,  // HighlightEdge
+    float Softness,       // Softness
+    float ShadowLevel,    // ShadowLevel
+    float MidLevel,       // MidLevel
+    float LitLevel,       // LitLevel
+    float TintR, float TintG, float TintB,   // ShadowTint
+    float TintAmount,     // TintAmount
+    float Rim,            // Rim
+    float RimR, float RimG, float RimB,      // RimColour
+    float Saturation);    // Saturation
+
+public static class Toons
+{
+    /// <summary>Every Toon, in the Settings page's order (after Off). Default = tuned for plain bands (harder steps, a deeper shadow band,
+    /// a brighter lit band, a stronger rim; user 2026-11-20: "tune them"); Kenshi = the user's Dust "PZA Toon - Kenshi", unchanged.</summary>
+    public static readonly ToonLook[] All =
+    [
+        new("PZA Toon - Default", 1f, true, 1f, 0.45f, 0.75f, 0.008f, 0.22f, 0.5f, 0.75f, 0.72f, 0.6f, 0.8f, 0.7f, 0.35f, 1f, 0.8f, 0.55f, 1.15f),
+        new("PZA Toon - Kenshi", 1f, true, 1f, 0.4f, 0.68f, 0.03f, 0.3f, 0.5f, 0.68f, 0.72f, 0.6f, 0.8f, 0.6f, 0.25f, 1f, 0.8f, 0.55f, 1.1f),
+        new("PZA Toon - 1", 0.49f, false, 1.69f, 0.35f, 0.05f, 0.01f, 0.1f, 0.1f, 0.5f, 0.62f, 0.66f, 1f, 0.6f, 0.25f, 1f, 0.95f, 0.85f, 1.1f),
+        new("PZA Toon - Kenshi 3-Band", 1f, true, 1f, 0.4f, 0.55f, 0.03f, 0.3f, 0.45f, 0.6f, 0.72f, 0.6f, 0.8f, 0.6f, 0.25f, 1f, 0.8f, 0.55f, 1.1f),
+        new("PZA Toon - Cel", 1f, true, 1f, 0.42f, 0.55f, 0.006f, 0.25f, 0.45f, 0.62f, 0.72f, 0.6f, 0.8f, 0.7f, 0.3f, 1f, 0.8f, 0.55f, 1.2f),
+        new("PZA Toon - Anime", 1f, true, 1f, 0.38f, 0.95f, 0.004f, 0.28f, 0.5f, 0.6f, 0.75f, 0.6f, 0.8f, 0.6f, 0f, 1f, 0.8f, 0.55f, 1.35f),
+        new("PZA Toon - Wind Waker", 1f, true, 1f, 0.33f, 0.36f, 0.01f, 0.2f, 0.45f, 0.5f, 0.72f, 0.6f, 0.8f, 0.5f, 0.25f, 1f, 0.8f, 0.55f, 1.15f),
+        new("PZA PS1 - Toon", 0.5f, true, 1f, 0.4f, 0.68f, 0.03f, 0.36f, 0.5f, 0.6f, 0.72f, 0.6f, 0.8f, 0.4f, 0.25f, 1f, 0.8f, 0.55f, 1.05f),
+    ];
+
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
+
+    public static ToonLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
