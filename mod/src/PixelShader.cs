@@ -2,8 +2,9 @@
 // The pixel-art look, ported from our Dust effect (pza_pixelart_ps.hlsl, HLSL) to the GLSL 330 Meitou's passes are written in
 // (MeitouClient PostProcessShaders: compiled by shaderc, run on Vulkan). Same maths, line for line: chunky pixels, a small palette, ordered
 // dither; the optional tone shaping (shadow lift faded by the frame's darkness, highlight hold) and the CRT section (scanlines, softness,
-// colour bleed); the N64 de-dither. Left out for now: the table palettes (Lospec, Custom 16, Palette maker: Dust palettes 6 and up) and the
-// camera-following grid.
+// colour bleed); the N64 de-dither. 0.6.0: Dust's own table palettes Desert 8, Desert 32 and Desert Night 16 (PZAPalettes.h, ours), pattern
+// dithered like Desert 16, and a Game Boy 4-shade green ramp. Left out: the Lospec palettes (other authors' colours), Custom 16 / Palette
+// maker, and the camera-following grid.
 //
 // Rows: Dust's picture has row 0 at the top. Meitou's Vulkan targets hold the picture bottom-up (IGpuContext.RenderTargetsBottomUp), so with
 // uFlipY the shader works in top-down "picture" pixels (the grid starts at the top-left as in Dust; scanlines darken the bottom of each art
@@ -19,6 +20,36 @@ public static class PixelShader
         (26, 20, 22), (59, 42, 38), (94, 60, 46), (138, 82, 56), (180, 116, 72), (214, 160, 104), (236, 210, 160), (246, 238, 216),
         (110, 106, 94), (160, 154, 136), (76, 94, 72), (124, 140, 90), (58, 78, 106), (94, 138, 168), (156, 196, 210), (140, 46, 34),
     ];
+
+    /// <summary>0.6.0: Dust's table palettes (PZAPalettes.h, PZA), 0..255, pattern dithered as Desert 16.</summary>
+    public static readonly (int R, int G, int B)[] Desert8 =
+    [
+        (26, 14, 14), (79, 41, 34), (132, 78, 54), (176, 124, 88), (209, 177, 143), (239, 231, 216), (109, 160, 190), (95, 112, 74),
+    ];
+
+    public static readonly (int R, int G, int B)[] Desert32 =
+    [
+        (20, 7, 7), (46, 18, 17), (73, 31, 25), (100, 46, 32), (126, 64, 40), (150, 85, 51), (172, 108, 66), (191, 133, 88),
+        (207, 160, 115), (222, 187, 148), (235, 214, 184), (250, 241, 223), (47, 39, 31), (84, 77, 68), (125, 119, 108), (167, 163, 151),
+        (212, 209, 196), (46, 53, 45), (74, 96, 59), (119, 135, 94), (169, 172, 160), (40, 46, 55), (57, 88, 116), (83, 135, 168),
+        (135, 182, 204), (209, 225, 231), (99, 26, 30), (161, 48, 43), (189, 109, 93), (231, 191, 87), (61, 130, 125), (83, 46, 76),
+    ];
+
+    public static readonly (int R, int G, int B)[] Night16 =
+    [
+        (34, 27, 45), (72, 50, 76), (116, 75, 99), (158, 105, 117), (194, 141, 135), (221, 182, 163), (244, 225, 204), (78, 83, 91),
+        (152, 159, 168), (57, 63, 58), (120, 124, 116), (18, 22, 31), (45, 70, 108), (88, 129, 165), (172, 186, 195), (233, 138, 53),
+    ];
+
+    /// <summary>"const vec3 NAME[32]" and "NAMELAB[32]" for a table palette: sRGB 0..1 and OKLab, padded with black to 32.</summary>
+    static string Table(string name, (int R, int G, int B)[] pal)
+    {
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        var rgb = pal.Select(c => string.Format(ci, "vec3({0}, {1}, {2}) / 255.0", c.R, c.G, c.B)).Concat(Enumerable.Repeat("vec3(0.0)", 32 - pal.Length));
+        var lab = pal.Select(c => Oklab(c.R / 255.0, c.G / 255.0, c.B / 255.0))
+            .Select(v => string.Format(ci, "vec3({0:R}, {1:R}, {2:R})", v.Item1, v.Item2, v.Item3)).Concat(Enumerable.Repeat("vec3(0.0)", 32 - pal.Length));
+        return $"const vec3 {name}[32] = vec3[](" + string.Join(", ", rgb) + ");\n" + $"const vec3 {name}LAB[32] = vec3[](" + string.Join(", ", lab) + ");\n";
+    }
 
     /// <summary>OKLab (Ottosson 2020) of an sRGB colour in 0..1, as the shader's ToOklab.</summary>
     public static (double L, double A, double B) Oklab(double r, double g, double b)
@@ -41,7 +72,8 @@ public static class PixelShader
         return "const vec3 PAL16LAB[17] = vec3[](" + string.Join(", ", items) + ");\n";
     }
 
-    public static readonly string Fragment = Head.Replace("//@PAL16LAB", LabTable(), StringComparison.Ordinal);
+    public static readonly string Fragment = Head.Replace("//@PAL16LAB", LabTable(), StringComparison.Ordinal)
+        .Replace("//@TABLES", Table("PALD8", Desert8) + Table("PALD32", Desert32) + Table("PALN16", Night16), StringComparison.Ordinal);
 
     const string Head = """
         #version 330 core
@@ -61,6 +93,9 @@ public static class PixelShader
             vec3(110, 106, 94) / 255.0, vec3(160, 154, 136) / 255.0, vec3(76, 94, 72) / 255.0, vec3(124, 140, 90) / 255.0,
             vec3(58, 78, 106) / 255.0, vec3(94, 138, 168) / 255.0, vec3(156, 196, 210) / 255.0, vec3(140, 46, 34) / 255.0);
         //@PAL16LAB
+        //@TABLES
+        // 0.6.0: the Game Boy's four greens (darkest first), stepped by brightness like LEAF 2-bit
+        const vec3 PALGB[4] = vec3[](vec3(15, 56, 15) / 255.0, vec3(48, 98, 48) / 255.0, vec3(139, 172, 15) / 255.0, vec3(155, 188, 15) / 255.0);
         // LEAF 2-bit (PZA)
         const vec3 PAL2[4] = vec3[](vec3(66, 24, 30) / 255.0, vec3(122, 60, 58) / 255.0, vec3(168, 106, 84) / 255.0, vec3(204, 150, 114) / 255.0);
 
@@ -145,6 +180,36 @@ public static class PixelShader
             return res;
         }
 
+        // 0.6.0: Pattern16's pattern dithering for a table palette of n colours (n <= 32; tables padded to 32)
+        vec3 PatternN(vec3 c, float d, vec3 pal[32], vec3 lab[32], int n)
+        {
+            vec3 lc = ToOklab(c);
+            int near = 0;
+            float nearD = 1e9;
+            for (int i = 0; i < 32; ++i)
+            {
+                if (i >= n) break;
+                vec3 q = lc - lab[i];
+                float dq = dot(q, q);
+                if (dq < nearD) { nearD = dq; near = i; }
+            }
+            float best = 1e9;
+            vec3 res = pal[near];
+            for (int k = 0; k < 32; ++k)
+            {
+                if (k >= n) break;
+                int a = min(near, k), b = max(near, k);
+                vec3 la = lab[a], dd = lab[b] - la;
+                float den = dot(dd, dd);
+                float r = den < 1e-12 ? 0.0 : clamp(dot(lc - la, dd) / den, 0.0, 1.0);
+                r = roundEven(r * 16.0) / 16.0;
+                vec3 e3 = lc - (la + dd * r);
+                float e = dot(e3, e3) + 0.15 * den * r * (1.0 - r);
+                if (e < best) { best = e; res = d < r ? pal[b] : pal[a]; }
+            }
+            return res;
+        }
+
         vec3 QuantizeCell(vec2 cell, float ps)
         {
             vec2 origin = cell * ps;
@@ -187,6 +252,14 @@ public static class PixelShader
             {
                 vec3 n = vec3(7.0, 7.0, 3.0);
                 res = floor(c * n + 0.5 + (d - 0.5) * uDither) / n;
+            }
+            else if (uPalette == 6) res = PatternN(c, d, PALD8, PALD8LAB, 8);
+            else if (uPalette == 7) res = PatternN(c, d, PALD32, PALD32LAB, 32);
+            else if (uPalette == 8) res = PatternN(c, d, PALN16, PALN16LAB, 16);
+            else if (uPalette == 9)
+            {
+                float t = dot(c, LUMA) * 3.0 + (d - 0.5) * uDither;
+                res = PALGB[clamp(int(floor(t + 0.5)), 0, 3)];
             }
             else res = Pattern16(c, d);   // Desert 16 (0.2.4): pattern dithering; uDither does not apply (the mix ratio is the dither)
             return res;

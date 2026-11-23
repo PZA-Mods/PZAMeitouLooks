@@ -9,7 +9,8 @@ namespace PZA.Looks.Meitou;
 public sealed record PixelLook(
     string Name,
     float PixelSize,        // PixelSize (screen pixels per art pixel at 1080 rows, scaled with the height)
-    int Palette,            // Palette: 0 Desert 16, 1 LEAF 2-bit, 2 full colour fewer levels, 3 PS1 15-bit, 4 N64 16-bit, 5 8-bit 3-3-2
+    int Palette,            // Palette: 0 Desert 16, 1 LEAF 2-bit, 2 full colour fewer levels, 3 PS1 15-bit, 4 N64 16-bit, 5 8-bit 3-3-2,
+                            //   0.6.0: 6 Desert 8, 7 Desert 32, 8 Desert Night 16, 9 Game Boy
     int Levels,             // Levels (palette 2)
     float Dither,           // Dither
     float Contrast,         // Contrast
@@ -44,6 +45,11 @@ public static class Looks
         new("PZA Soft 240 - Standard", 4.0f, 4, 16, 1.0f, 1.0f, CrtSoft: 0.35f, Sampling: 1, NativeLines: 240),
         // 0.3.0: "PZA Diorama - Pixel"'s fine full-colour pixels (pairs with Tilt-Shift "PZA Diorama")
         new("PZA Diorama - Pixel", 2.5f, 2, 16, 0f, 1.0f, HighlightHold: 0.5f, Sampling: 1),
+        // 0.6.0: Dust's table palettes, and the Game Boy (4 greens, 144 lines, the screen's own size)
+        new("PZA Pixel - Desert 8", 4.09f, 6, 6, 0.6f, 1.15f),
+        new("PZA Pixel - Desert 32", 4.09f, 7, 6, 0.6f, 1.15f),
+        new("PZA Pixel - Desert Night", 4.09f, 8, 6, 0.6f, 1.1f),
+        new("PZA Game Boy", 4f, 9, 6, 0.6f, 1.1f, Sampling: 1, NativeLines: 144),
     ];
 
     /// <summary>Off and every look's name: the Settings page's options.</summary>
@@ -227,4 +233,109 @@ public static class Toons
     public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
 
     public static ToonLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
+
+/// <summary>0.6.0: one Screen look, drawn LAST over everything (ScreenShader): lens colour fringe (chromatic aberration, which Meitou does
+/// not have), the CRT wiggle (line wobble, a slow roll, flicker) and VHS tape (tracking band, noise, colour smear, softness). Values 0..1,
+/// fringe in screen widths at the corner (every PZA preset at or under 0.002, the user's chromatic aberration cap).</summary>
+public sealed record ScreenLook(
+    string Name,
+    float Fringe, float Wobble, float Roll, float Flicker, float Tracking, float Noise, float Bleed, float Soften, float Strength = 1);
+
+public static class Screens
+{
+    public static readonly ScreenLook[] All =
+    [
+        new("PZA Screen - Default", 0.0015f, 0.35f, 0.15f, 0.25f, 0f, 0.08f, 0f, 0.15f),       // the CRT wiggle (Planned since 0.4.0)
+        new("PZA Screen - Lens Fringe", 0.002f, 0f, 0f, 0f, 0f, 0f, 0f, 0f),
+        new("PZA Screen - VHS", 0.002f, 0.25f, 0f, 0.1f, 0.5f, 0.3f, 0.6f, 0.45f),
+        new("PZA Screen - VHS Worn", 0.002f, 0.5f, 0.05f, 0.2f, 1f, 0.55f, 0.85f, 0.6f),
+    ];
+
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
+
+    public static ScreenLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
+
+/// <summary>0.6.0: one Halftone (HalftoneShader): printed dots. Mono ink dots where the picture is darker than the shadow start (comic),
+/// or every tone on flat paper (newspaper), or cyan / magenta / yellow dots (pop art).</summary>
+public sealed record HalftoneLook(
+    string Name,
+    float DotSize,      // dot spacing in pixels at 1080 lines
+    float Angle,        // screen angle in degrees
+    float Threshold,    // shadow start: 0 = no dots, 1 = dots on every tone
+    float Paper,        // 0 = the picture between the dots, 1 = flat paper
+    float InkR, float InkG, float InkB,
+    bool Colour,        // cyan / magenta / yellow dots instead of one ink
+    float Strength);
+
+public static class Halftones
+{
+    public static readonly HalftoneLook[] All =
+    [
+        new("PZA Halftone - Default", 6f, 45f, 0.55f, 0f, 0.08f, 0.06f, 0.07f, false, 0.9f),    // comic: ink dots in the shadows
+        new("PZA Halftone - Newspaper", 5f, 45f, 1f, 1f, 0.1f, 0.09f, 0.08f, false, 1f),
+        new("PZA Halftone - Pop Art", 8f, 15f, 1f, 1f, 0f, 0f, 0f, true, 1f),
+    ];
+
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
+
+    public static HalftoneLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
+
+/// <summary>0.6.0: one film noir (NoirShader): hard black and white with crushed blacks, a silver tint, darker edges, and optionally ONE
+/// colour kept (Sin City's red).</summary>
+public sealed record NoirLook(
+    string Name,
+    float Contrast,      // 0.5..2.5
+    float Crush,         // 0..0.5: how much of the dark end turns pure black
+    float TintR, float TintG, float TintB,
+    float TintAmount,
+    int Keep,            // NoirKeep: 0 none, 1 red, 2 amber, 3 green, 4 blue
+    float KeepAmount,
+    float Edge,          // edge darkening
+    float Strength);
+
+public static class Noirs
+{
+    /// <summary>The hues a noir can keep (OKLab hue angles, degrees), in the Keep list's order after None.</summary>
+    public static readonly float[] KeepHues = [0f, 25f, 70f, 145f, 255f];
+
+    public static readonly NoirLook[] All =
+    [
+        new("PZA Noir - Default", 1.45f, 0.08f, 0.85f, 0.9f, 1f, 0.2f, 0, 0f, 0.4f, 1f),
+        new("PZA Noir - Sin City", 1.7f, 0.15f, 1f, 1f, 1f, 0f, 1, 1f, 0.3f, 1f),
+        new("PZA Noir - Silver Screen", 1.15f, 0f, 1f, 0.96f, 0.88f, 0.25f, 0, 0f, 0.3f, 1f),
+    ];
+
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
+
+    public static NoirLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
+
+/// <summary>0.6.0: a Combo, one pick for several effects (the user's Dust Combo presets and new ones). Each entry: list key -> preset name;
+/// a list not named is set Off.</summary>
+public sealed record ComboLook(string Name, (string List, string Preset)[] Sets);
+
+public static class Combos
+{
+    public static readonly ComboLook[] All =
+    [
+        new("PZA Combo - Painted Miniature", [("Kuwahara", "PZA Kuwahara - Painted Miniature"), ("Toon", "PZA Toon - Cel"), ("TiltShift", "PZA Diorama")]),
+        new("PZA Combo - Ink Miniature", [("Toon", "PZA Toon - Anime"), ("Outline", "PZA Outline - Ink"), ("TiltShift", "PZA Miniature")]),
+        new("PZA Combo - Retro Cel", [("Look", "PZA PS1 - Standard"), ("Toon", "PZA Toon - Cel"), ("Outline", "PZA Outline - Ink")]),
+        new("PZA Combo - CRT Anime", [("Look", "PZA PS1 - CRT"), ("Toon", "PZA Toon - Anime"), ("Screen", "PZA Screen - Default")]),
+        new("PZA Combo - Soft 240 Toon", [("Look", "PZA Soft 240 - Standard"), ("Toon", "PZA Toon - Cel"), ("N64", "PZA N64 - Soft 240")]),
+        new("PZA Combo - 16-Bit Miniature", [("Look", "PZA Pixel - 1"), ("TiltShift", "PZA Miniature")]),
+        new("PZA Combo - HD-2D", [("Look", "PZA Pixel - 2"), ("TiltShift", "PZA HD-2D")]),
+        new("PZA Combo - Diorama", [("Look", "PZA Diorama - Pixel"), ("TiltShift", "PZA Diorama")]),
+        new("PZA Combo - Film Noir", [("Noir", "PZA Noir - Default"), ("Outline", "PZA Outline - Soft")]),
+        new("PZA Combo - Comic Book", [("Toon", "PZA Toon - Anime"), ("Outline", "PZA Outline - Ink"), ("Halftone", "PZA Halftone - Default")]),
+        new("PZA Combo - Handheld", [("Look", "PZA Game Boy")]),
+        new("PZA Combo - Found Footage", [("Screen", "PZA Screen - VHS Worn")]),
+    ];
+
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
+
+    public static ComboLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
 }

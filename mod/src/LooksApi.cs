@@ -11,7 +11,8 @@ namespace PZA.Looks.Meitou;
 public static class LooksApi
 {
     /// <summary>Bumped when a member changes meaning; a caller checks it is at least the version it was written for.</summary>
-    public const int Version = 4;   // 4 (0.5.0): + Kuwahara / N64 / Toon names, getters and setters (Toon applies at the next start)
+    public const int Version = 5;   // 5 (0.6.0): + Noir / Halftone / Screen / Combo names, getters and setters
+    // was 4   // 4 (0.5.0): + Kuwahara / N64 / Toon names, getters and setters (Toon applies at the next start)
     // 2 (0.3.0): + FisheyeNames / Fisheye / SetFisheye; 3 (0.4.0): + OutlineNames / Outline / SetOutline,
                                     // every list ends with "Custom" (the player's own slider values), and a preset set here fills its sliders
 
@@ -71,6 +72,27 @@ public static class LooksApi
     public static string ToonRunning => ToonPatch.Frozen?.Name ?? Looks.Off;
     public static bool SetToon(string name) => Set(nameof(LooksSettings.Toon), name, Toons.Names);
 
+    /// <summary>Version 5: Off, every Noir's name and Custom.</summary>
+    public static string[] NoirNames => [.. Noirs.Names];
+    public static string Noir => PixelPass.Settings.Noir;
+    public static bool SetNoir(string name) => Set(nameof(LooksSettings.Noir), name, Noirs.Names);
+
+    /// <summary>Version 5: Off, every Halftone's name and Custom.</summary>
+    public static string[] HalftoneNames => [.. Halftones.Names];
+    public static string Halftone => PixelPass.Settings.Halftone;
+    public static bool SetHalftone(string name) => Set(nameof(LooksSettings.Halftone), name, Halftones.Names);
+
+    /// <summary>Version 5: Off, every Screen's name (CRT wiggle, lens fringe, VHS) and Custom.</summary>
+    public static string[] ScreenNames => [.. Screens.Names];
+    public static string Screen => PixelPass.Settings.Screen;
+    public static bool SetScreen(string name) => Set(nameof(LooksSettings.Screen), name, Screens.Names);
+
+    /// <summary>Version 5: Off, every Combo's name and Custom. A combo sets every effect list (Off turns them all off); a combo with a Toon
+    /// draws its Toon from the next start.</summary>
+    public static string[] ComboNames => [.. Combos.Names];
+    public static string Combo => PixelPass.Settings.Combo;
+    public static bool SetCombo(string name) => Set(nameof(LooksSettings.Combo), name, Combos.Names);
+
     static bool Set(string key, string name, string[] allowed)
     {
         if (!allowed.Contains(name, StringComparer.Ordinal)) return false;
@@ -79,7 +101,7 @@ public static class LooksApi
         else
         {   // no group (the offline check): the preset's sliders as the group's Changed would fill them
             typeof(LooksSettings).GetProperty(key)!.SetValue(PixelPass.Settings, name);
-            LookValues.ApplyPreset(null, PixelPass.Settings, key);
+            LookValues.OnChanged(null, PixelPass.Settings, key);   // 0.6.0: as the group's Changed (a combo, or a list changed under one)
         }
         return true;
     }

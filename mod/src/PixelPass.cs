@@ -29,6 +29,9 @@ static class PixelPass
     static OutlineLook? s_frameLine;
     static KuwaharaLook? s_frameKw;
     static N64Look? s_frameN64;
+    static NoirLook? s_frameNoir;          // 0.6.0
+    static HalftoneLook? s_frameHt;
+    static ScreenLook? s_frameScreen;
     static bool s_failed, s_hdrLogged;
     static string? s_lastChoice;
     public static int FramesDrawn { get; private set; }
@@ -49,6 +52,7 @@ static class PixelPass
         __state = null;
         (s_frameLook, s_frameTilt, s_frameFish, s_frameLine) = (null, null, null, null);
         (s_frameKw, s_frameN64) = (null, null);
+        (s_frameNoir, s_frameHt, s_frameScreen) = (null, null, null);
         if (s_failed) return;
         // 0.4.0: the sliders' values (a preset filled them; Custom = the player's own)
         var look = LookValues.Pixel(Settings);
@@ -57,8 +61,12 @@ static class PixelPass
         var line = LookValues.Outline(Settings);
         var kw = LookValues.Kuwahara(Settings);   // 0.5.0
         var n64 = LookValues.N64(Settings);
-        LogChoice(look, tilt, fish, line, kw, n64);
-        if (look is null && tilt is null && fish is null && line is null && kw is null && n64 is null) return;
+        var noir = LookValues.Noir(Settings);   // 0.6.0
+        var ht = LookValues.Halftone(Settings);
+        var screen = LookValues.Screen(Settings);
+        LogChoice(look, tilt, fish, line, kw, n64, noir, ht, screen);
+        if (look is null && tilt is null && fish is null && line is null && kw is null && n64 is null && noir is null && ht is null && screen is null)
+            return;
         try
         {
             if (__instance.Options.HdrPeak > 1)
@@ -70,13 +78,15 @@ static class PixelPass
             var (w, h) = Access.DisplaySize(__instance);
             if (w <= 0 || h <= 0) return;
             if (!TiltPass.Ready(__instance)) (tilt, line, n64) = (null, null, null);   // no depth yet (first frames): the others alone
-            if (look is null && tilt is null && fish is null && line is null && kw is null && n64 is null) return;
+            if (look is null && tilt is null && fish is null && line is null && kw is null && n64 is null && noir is null && ht is null
+                && screen is null) return;
             int passes = (look is null ? 0 : 1) + (tilt is null ? 0 : 1) + (fish is null ? 0 : 1) + (line is null ? 0 : 1)
-                + (kw is null ? 0 : 1) + (n64 is null ? 0 : 1);
+                + (kw is null ? 0 : 1) + (n64 is null ? 0 : 1) + (noir is null ? 0 : 1) + (ht is null ? 0 : 1) + (screen is null ? 0 : 1);
             Ensure(__instance, w, h, passes >= 2);
             __state = final;
             (s_frameLook, s_frameTilt, s_frameFish, s_frameLine) = (look, tilt, fish, line);
             (s_frameKw, s_frameN64) = (kw, n64);
+            (s_frameNoir, s_frameHt, s_frameScreen) = (noir, ht, screen);
             final = PassTargets.Of(Access.TextureOf(s_a!), null);
         }
         catch (Exception e)
@@ -94,7 +104,8 @@ static class PixelPass
             // 0.3.0: Tilt-Shift, Fisheye, the look, in Dust's order; each reads the last one's picture (A, B, A...) and the last draws the frame.
             // 0.4.0: the Outline first (Dust: Outline at POST_LIGHTING 50, before them all), on the picture its depth belongs to
             // 0.5.0: N64's fog (on the scene, with its depth), then Kuwahara's paint, then the Outline drawn over the paint
-            var steps = new List<(LegacyProgram P, Action<object> Set, string Stamp)>(6);
+            // 0.6.0: Noir and Halftone on the scene before the look (a pixel look then quantises them), the Screen drawn last over everything
+            var steps = new List<(LegacyProgram P, Action<object> Set, string Stamp)>(9);
             var size = (s_width, s_height);
             if (s_frameN64 is { } n64)
                 steps.Add((N64Pass.Program!, src => N64Pass.Set(__instance, n64, src, Settings.Split), "pza n64"));
@@ -106,8 +117,14 @@ static class PixelPass
                 steps.Add((TiltPass.Program!, src => TiltPass.Set(__instance, tilt, src, size, Settings.Split, TiltMask), "pza tilt-shift"));
             if (s_frameFish is { } fish)
                 steps.Add((FisheyePass.Program!, src => FisheyePass.Set(__instance, fish, src, size, Settings.Split), "pza fisheye"));
+            if (s_frameNoir is { } noir)
+                steps.Add((NoirPass.Program!, src => NoirPass.Set(__instance, noir, src, size, Settings.Split), "pza noir"));
+            if (s_frameHt is { } ht)
+                steps.Add((HalftonePass.Program!, src => HalftonePass.Set(__instance, ht, src, size, Settings.Split), "pza halftone"));
             if (s_frameLook is { } look)
                 steps.Add((LookPass.Program!, src => LookPass.Set(__instance, look, src, size, Settings.Split), "pza looks"));
+            if (s_frameScreen is { } screen)
+                steps.Add((ScreenPass.Program!, src => ScreenPass.Set(__instance, screen, src, size, Settings.Split), "pza screen"));
             object source = s_a!;
             for (int i = 0; i < steps.Count; i++)
             {
@@ -124,7 +141,8 @@ static class PixelPass
             if (FramesDrawn++ == 0)
                 Log.Line($"first frame drawn: look '{s_frameLook?.Name ?? Looks.Off}', Tilt-Shift '{s_frameTilt?.Name ?? Looks.Off}', "
                     + $"Fisheye '{s_frameFish?.Name ?? Looks.Off}', Outline '{s_frameLine?.Name ?? Looks.Off}', Kuwahara '{s_frameKw?.Name ?? Looks.Off}', "
-                    + $"N64 '{s_frameN64?.Name ?? Looks.Off}' at {s_width}x{s_height}");
+                    + $"N64 '{s_frameN64?.Name ?? Looks.Off}', Noir '{s_frameNoir?.Name ?? Looks.Off}', Halftone '{s_frameHt?.Name ?? Looks.Off}', "
+                    + $"Screen '{s_frameScreen?.Name ?? Looks.Off}' at {s_width}x{s_height}");
         }
         catch (Exception e)
         {
@@ -141,6 +159,9 @@ static class PixelPass
         OutlinePass.Ensure(pp);
         KuwaharaPass.Ensure(pp);
         N64Pass.Ensure(pp);
+        NoirPass.Ensure(pp);
+        HalftonePass.Ensure(pp);
+        ScreenPass.Ensure(pp);
         if (s_a is not null && (s_width != w || s_height != h))
         {
             Access.TextureOf(s_a).Dispose();
@@ -152,11 +173,13 @@ static class PixelPass
         (s_width, s_height) = (w, h);
     }
 
-    static void LogChoice(PixelLook? look, TiltLook? tilt, FisheyeLook? fish, OutlineLook? line, KuwaharaLook? kw, N64Look? n64)
+    static void LogChoice(PixelLook? look, TiltLook? tilt, FisheyeLook? fish, OutlineLook? line, KuwaharaLook? kw, N64Look? n64, NoirLook? noir,
+        HalftoneLook? ht, ScreenLook? screen)
     {
         // the names only (a slider dragged on the Settings page would log every step otherwise)
         string choice = $"look '{look?.Name ?? Looks.Off}', Tilt-Shift '{tilt?.Name ?? Looks.Off}', Fisheye '{fish?.Name ?? Looks.Off}', "
-            + $"Outline '{line?.Name ?? Looks.Off}', Kuwahara '{kw?.Name ?? Looks.Off}', N64 '{n64?.Name ?? Looks.Off}'";
+            + $"Outline '{line?.Name ?? Looks.Off}', Kuwahara '{kw?.Name ?? Looks.Off}', N64 '{n64?.Name ?? Looks.Off}', "
+            + $"Noir '{noir?.Name ?? Looks.Off}', Halftone '{ht?.Name ?? Looks.Off}', Screen '{screen?.Name ?? Looks.Off}'";
         if (choice == s_lastChoice) return;
         s_lastChoice = choice;
         Log.Line(choice);
@@ -500,5 +523,129 @@ static class N64Pass
             s_logged = true;
             Log.Line($"n64: fog {f.FogStart * N64s.FarClip:0} to {f.FogEnd * N64s.FarClip:0} units, amount {f.FogAmount}, planes {Access.Planes(pp)}");
         }
+    }
+}
+
+/// <summary>0.6.0: PZA Noir (NoirShader).</summary>
+public static class NoirPass
+{
+    public static LegacyProgram? Program;
+    static SamplerSlot s_image;
+    static UniformHandle s_viewport, s_contrast, s_crush, s_tintAmount, s_keepHue, s_keepAmount, s_edge, s_strength, s_tint, s_split;
+
+    public static void Ensure(PostProcess pp)
+    {
+        if (Program is not null) return;
+        var p = Program = LegacyProgram.Create(pp.Gpu, Access.Vertex!, NoirShader.Fragment, "pza looks noir");
+        s_image = p.Sampler("uImage");
+        (s_viewport, s_contrast, s_crush, s_tintAmount, s_keepHue) = (p.Uniform("uViewport"), p.Uniform("uContrast"), p.Uniform("uCrush"),
+            p.Uniform("uTintAmount"), p.Uniform("uKeepHue"));
+        (s_keepAmount, s_edge, s_strength, s_tint, s_split) = (p.Uniform("uKeepAmount"), p.Uniform("uEdge"), p.Uniform("uStrength"),
+            p.Uniform("uTint"), p.Uniform("uSplit"));
+        Log.Line("noir program compiled");
+    }
+
+    /// <summary>The kept hue in degrees, or -1 for none (a broken index = none).</summary>
+    public static float KeepHue(int keep) => keep >= 1 && keep < Noirs.KeepHues.Length ? Noirs.KeepHues[keep] : -1f;
+
+    public static void Set(PostProcess pp, NoirLook n, object source, (int W, int H) size, bool split)
+    {
+        var p = Program!;
+        Access.Bind(pp, p, s_image, source);
+        p.Set(s_viewport, size.W, (float)size.H);
+        p.Set(s_contrast, n.Contrast);
+        p.Set(s_crush, n.Crush);
+        p.Set(s_tintAmount, n.TintAmount);
+        p.Set(s_keepHue, KeepHue(n.Keep));
+        p.Set(s_keepAmount, n.KeepAmount);
+        p.Set(s_edge, n.Edge);
+        p.Set(s_strength, n.Strength);
+        p.Set(s_tint, new System.Numerics.Vector3(n.TintR, n.TintG, n.TintB));
+        p.Set(s_split, split ? 1 : 0);
+    }
+}
+
+/// <summary>0.6.0: PZA Halftone (HalftoneShader).</summary>
+static class HalftonePass
+{
+    public static LegacyProgram? Program;
+    static SamplerSlot s_image;
+    static UniformHandle s_viewport, s_dot, s_angle, s_threshold, s_paper, s_strength, s_ink, s_colour, s_flipY, s_split;
+
+    public static void Ensure(PostProcess pp)
+    {
+        if (Program is not null) return;
+        var p = Program = LegacyProgram.Create(pp.Gpu, Access.Vertex!, HalftoneShader.Fragment, "pza looks halftone");
+        s_image = p.Sampler("uImage");
+        (s_viewport, s_dot, s_angle, s_threshold, s_paper) = (p.Uniform("uViewport"), p.Uniform("uDot"), p.Uniform("uAngle"),
+            p.Uniform("uThreshold"), p.Uniform("uPaper"));
+        (s_strength, s_ink, s_colour, s_flipY, s_split) = (p.Uniform("uStrength"), p.Uniform("uInk"), p.Uniform("uColour"), p.Uniform("uFlipY"),
+            p.Uniform("uSplit"));
+        Log.Line("halftone program compiled");
+    }
+
+    public static void Set(PostProcess pp, HalftoneLook h, object source, (int W, int H) size, bool split)
+    {
+        var p = Program!;
+        Access.Bind(pp, p, s_image, source);
+        p.Set(s_viewport, size.W, (float)size.H);
+        p.Set(s_dot, h.DotSize);
+        p.Set(s_angle, h.Angle);
+        p.Set(s_threshold, h.Threshold);
+        p.Set(s_paper, h.Paper);
+        p.Set(s_strength, h.Strength);
+        p.Set(s_ink, new System.Numerics.Vector3(h.InkR, h.InkG, h.InkB));
+        p.Set(s_colour, h.Colour ? 1 : 0);
+        p.Set(s_flipY, pp.Gpu.RenderTargetsBottomUp ? 1 : 0);
+        p.Set(s_split, split ? 1 : 0);
+    }
+}
+
+/// <summary>0.6.0: PZA Screen (ScreenShader), drawn last. Its clock is real time (the wiggle runs on while the game is paused, as a CRT would),
+/// wrapped every 1000 s so a float keeps its precision (1000 s: a whole number of tracking-band rolls).</summary>
+public static class ScreenPass
+{
+    public static LegacyProgram? Program;
+    static SamplerSlot s_image;
+    static UniformHandle s_viewport, s_time, s_fringe, s_wobble, s_roll, s_flicker, s_tracking, s_noise, s_bleed, s_soften, s_strength, s_flipY,
+        s_split;
+    static readonly System.Diagnostics.Stopwatch s_clock = System.Diagnostics.Stopwatch.StartNew();
+
+    public static void Ensure(PostProcess pp)
+    {
+        if (Program is not null) return;
+        var p = Program = LegacyProgram.Create(pp.Gpu, Access.Vertex!, ScreenShader.Fragment, "pza looks screen");
+        s_image = p.Sampler("uImage");
+        (s_viewport, s_time, s_fringe, s_wobble, s_roll) = (p.Uniform("uViewport"), p.Uniform("uTime"), p.Uniform("uFringe"), p.Uniform("uWobble"),
+            p.Uniform("uRoll"));
+        (s_flicker, s_tracking, s_noise, s_bleed, s_soften) = (p.Uniform("uFlicker"), p.Uniform("uTracking"), p.Uniform("uNoise"),
+            p.Uniform("uBleed"), p.Uniform("uSoften"));
+        (s_strength, s_flipY, s_split) = (p.Uniform("uStrength"), p.Uniform("uFlipY"), p.Uniform("uSplit"));
+        Log.Line("screen program compiled");
+    }
+
+    public static float Clock(double seconds)
+    {
+        float t = (float)(double.IsFinite(seconds) && seconds > 0 ? seconds % 1000.0 : 0.0);
+        return t < 1000f ? t : 0f;   // 999.99999 s rounds up to 1000 as a float (found by fuzz 2026-11-22)
+    }
+
+    public static void Set(PostProcess pp, ScreenLook c, object source, (int W, int H) size, bool split)
+    {
+        var p = Program!;
+        Access.Bind(pp, p, s_image, source);
+        p.Set(s_viewport, size.W, (float)size.H);
+        p.Set(s_time, Clock(s_clock.Elapsed.TotalSeconds));
+        p.Set(s_fringe, c.Fringe);
+        p.Set(s_wobble, c.Wobble);
+        p.Set(s_roll, c.Roll);
+        p.Set(s_flicker, c.Flicker);
+        p.Set(s_tracking, c.Tracking);
+        p.Set(s_noise, c.Noise);
+        p.Set(s_bleed, c.Bleed);
+        p.Set(s_soften, c.Soften);
+        p.Set(s_strength, c.Strength);
+        p.Set(s_flipY, pp.Gpu.RenderTargetsBottomUp ? 1 : 0);
+        p.Set(s_split, split ? 1 : 0);
     }
 }

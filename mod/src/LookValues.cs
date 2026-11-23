@@ -9,14 +9,17 @@ namespace PZA.Looks.Meitou;
 
 public static class LookValues
 {
-    public static readonly string[] Palettes = ["Desert 16", "LEAF 2-bit", "Full colour", "PS1 15-bit", "N64 16-bit", "8-bit 3-3-2"];
+    public static readonly string[] Palettes = ["Desert 16", "LEAF 2-bit", "Full colour", "PS1 15-bit", "N64 16-bit", "8-bit 3-3-2",
+        "Desert 8", "Desert 32", "Desert Night 16", "Game Boy"];   // 0.6.0: 6..9
     public static readonly string[] Samplings = ["Centre", "Cell average"];
-    public static readonly string[] Natives = ["Off", "224 lines", "240 lines", "480 lines"];
-    static readonly int[] NativeLines = [0, 224, 240, 480];
+    public static readonly string[] Natives = ["Off", "224 lines", "240 lines", "480 lines", "144 lines"];
+    static readonly int[] NativeLines = [0, 224, 240, 480, 144];   // 144: the Game Boy's lines (0.6.0)
     public static readonly string[] Fits = ["Fill", "Full width"];
+    public static readonly string[] Keeps = ["None", "Red", "Amber", "Green", "Blue"];   // 0.6.0: Noirs.KeepHues' order
 
     /// <summary>Which list each slider belongs to (the slider's key prefix).</summary>
-    public static string? ListOf(string key) => key.Length < 3 ? null : key[..2] switch
+    // 0.6.0: a list's own key is never a slider (the Screen list starts with Sc, its sliders' prefix)
+    public static string? ListOf(string key) => key.Length < 3 || Array.IndexOf(Lists, key) >= 0 ? null : key[..2] switch
     {
         "Px" => nameof(LooksSettings.Look),
         "Ts" => nameof(LooksSettings.TiltShift),
@@ -25,12 +28,16 @@ public static class LookValues
         "Kw" => nameof(LooksSettings.Kuwahara),   // 0.5.0
         "Nf" => nameof(LooksSettings.N64),
         "Tn" => nameof(LooksSettings.Toon),
+        "Sc" => nameof(LooksSettings.Screen),   // 0.6.0
+        "Ht" => nameof(LooksSettings.Halftone),
+        "Nr" => nameof(LooksSettings.Noir),
         _ => null,
     };
 
     /// <summary>Every effect's preset list, in the Settings page's order.</summary>
     public static readonly string[] Lists = [nameof(LooksSettings.Look), nameof(LooksSettings.TiltShift), nameof(LooksSettings.Fisheye),
-        nameof(LooksSettings.Outline), nameof(LooksSettings.Kuwahara), nameof(LooksSettings.N64), nameof(LooksSettings.Toon)];
+        nameof(LooksSettings.Outline), nameof(LooksSettings.Kuwahara), nameof(LooksSettings.N64), nameof(LooksSettings.Toon),
+        nameof(LooksSettings.Noir), nameof(LooksSettings.Halftone), nameof(LooksSettings.Screen)];   // 0.6.0: the Combo list is not one of these
 
     [ThreadStatic] static bool t_applying;
 
@@ -52,13 +59,43 @@ public static class LookValues
     public static void OnChanged(ModSettingsGroup? group, LooksSettings s, string key)
     {
         if (t_applying) return;
+        if (key == nameof(LooksSettings.Combo)) { ApplyCombo(group, s); return; }
         if (ListOf(key) is { } list)
         {
             string now = (string)typeof(LooksSettings).GetProperty(list)!.GetValue(s)!;
             if (now != Looks.Custom && now != Looks.Off) Run(() => Set(group, s, list, Looks.Custom));
+            ComboCustom(group, s);
             return;
         }
+        if (Array.IndexOf(Lists, key) >= 0) ComboCustom(group, s);
         ApplyPreset(group, s, key);
+    }
+
+    /// <summary>0.6.0: a combo sets every effect list: its named presets, Off for the rest (Combo Off turns every effect off); Custom leaves
+    /// them as they are.</summary>
+    public static void ApplyCombo(ModSettingsGroup? group, LooksSettings s)
+    {
+        if (s.Combo == Looks.Custom) return;
+        var c = Combos.Find(s.Combo);
+        if (c is null && s.Combo != Looks.Off) return;
+        Run(() =>
+        {
+            foreach (var list in Lists)
+            {
+                string pick = Looks.Off;
+                if (c is not null)
+                    foreach (var (l, preset) in c.Sets)
+                        if (l == list) pick = preset;
+                Set(group, s, list, pick);
+                ApplyPreset(group, s, list);
+            }
+        });
+    }
+
+    /// <summary>The player changed one effect after picking a combo: the combo list says Custom.</summary>
+    static void ComboCustom(ModSettingsGroup? group, LooksSettings s)
+    {
+        if (Combos.Find(s.Combo) is not null) Run(() => Set(group, s, nameof(LooksSettings.Combo), Looks.Custom));
     }
 
     /// <summary>Copies the list's named preset (if it names one) into its sliders. Off and Custom leave the sliders as they are.</summary>
@@ -167,6 +204,49 @@ public static class LookValues
                     Set(group, s, nameof(s.TnSaturation), t.Saturation);
                 });
                 break;
+            case nameof(LooksSettings.Noir) when Noirs.Find(s.Noir) is { } n:
+                Run(() =>
+                {
+                    Set(group, s, nameof(s.NrContrast), n.Contrast);
+                    Set(group, s, nameof(s.NrCrush), n.Crush);
+                    Set(group, s, nameof(s.NrTintR), n.TintR);
+                    Set(group, s, nameof(s.NrTintG), n.TintG);
+                    Set(group, s, nameof(s.NrTintB), n.TintB);
+                    Set(group, s, nameof(s.NrTintAmount), n.TintAmount);
+                    Set(group, s, nameof(s.NrKeep), Keeps[Math.Clamp(n.Keep, 0, Keeps.Length - 1)]);
+                    Set(group, s, nameof(s.NrKeepAmount), n.KeepAmount);
+                    Set(group, s, nameof(s.NrEdge), n.Edge);
+                    Set(group, s, nameof(s.NrStrength), n.Strength);
+                });
+                break;
+            case nameof(LooksSettings.Halftone) when Halftones.Find(s.Halftone) is { } h:
+                Run(() =>
+                {
+                    Set(group, s, nameof(s.HtDotSize), h.DotSize);
+                    Set(group, s, nameof(s.HtAngle), h.Angle);
+                    Set(group, s, nameof(s.HtThreshold), h.Threshold);
+                    Set(group, s, nameof(s.HtPaper), h.Paper);
+                    Set(group, s, nameof(s.HtInkR), h.InkR);
+                    Set(group, s, nameof(s.HtInkG), h.InkG);
+                    Set(group, s, nameof(s.HtInkB), h.InkB);
+                    Set(group, s, nameof(s.HtColour), h.Colour);
+                    Set(group, s, nameof(s.HtStrength), h.Strength);
+                });
+                break;
+            case nameof(LooksSettings.Screen) when Screens.Find(s.Screen) is { } c:
+                Run(() =>
+                {
+                    Set(group, s, nameof(s.ScFringe), c.Fringe);
+                    Set(group, s, nameof(s.ScWobble), c.Wobble);
+                    Set(group, s, nameof(s.ScRoll), c.Roll);
+                    Set(group, s, nameof(s.ScFlicker), c.Flicker);
+                    Set(group, s, nameof(s.ScTracking), c.Tracking);
+                    Set(group, s, nameof(s.ScNoise), c.Noise);
+                    Set(group, s, nameof(s.ScBleed), c.Bleed);
+                    Set(group, s, nameof(s.ScSoften), c.Soften);
+                    Set(group, s, nameof(s.ScStrength), c.Strength);
+                });
+                break;
         }
     }
 
@@ -273,4 +353,38 @@ public static class LookValues
         F(s.TnRim, 0, 1, 0.25f),
         F(s.TnRimR, 0, 1, 1), F(s.TnRimG, 0, 1, 0.8f), F(s.TnRimB, 0, 1, 0.55f),
         F(s.TnSaturation, 0, 2, 1.1f));
+
+    // 0.6.0
+    public static NoirLook? Noir(LooksSettings s) => s.Noir == Looks.Off || !Noirs.Names.Contains(s.Noir) ? null : new(
+        s.Noir,
+        F(s.NrContrast, 0.5f, 2.5f, 1.45f),
+        F(s.NrCrush, 0, 0.5f, 0.08f),
+        F(s.NrTintR, 0, 1, 0.85f), F(s.NrTintG, 0, 1, 0.9f), F(s.NrTintB, 0, 1, 1),
+        F(s.NrTintAmount, 0, 1, 0.2f),
+        Math.Max(0, Array.IndexOf(Keeps, s.NrKeep)),
+        F(s.NrKeepAmount, 0, 1, 0),
+        F(s.NrEdge, 0, 1, 0.4f),
+        F(s.NrStrength, 0, 1, 1));
+
+    public static HalftoneLook? Halftone(LooksSettings s) => s.Halftone == Looks.Off || !Halftones.Names.Contains(s.Halftone) ? null : new(
+        s.Halftone,
+        F(s.HtDotSize, 2, 16, 6),
+        F(s.HtAngle, 0, 90, 45),
+        F(s.HtThreshold, 0, 1, 0.55f),
+        F(s.HtPaper, 0, 1, 0),
+        F(s.HtInkR, 0, 1, 0.08f), F(s.HtInkG, 0, 1, 0.06f), F(s.HtInkB, 0, 1, 0.07f),
+        s.HtColour,
+        F(s.HtStrength, 0, 1, 0.9f));
+
+    public static ScreenLook? Screen(LooksSettings s) => s.Screen == Looks.Off || !Screens.Names.Contains(s.Screen) ? null : new(
+        s.Screen,
+        F(s.ScFringe, 0, 0.01f, 0.0015f),
+        F(s.ScWobble, 0, 1, 0.35f),
+        F(s.ScRoll, 0, 1, 0.15f),
+        F(s.ScFlicker, 0, 1, 0.25f),
+        F(s.ScTracking, 0, 1, 0),
+        F(s.ScNoise, 0, 1, 0.08f),
+        F(s.ScBleed, 0, 1, 0),
+        F(s.ScSoften, 0, 1, 0.15f),
+        F(s.ScStrength, 0, 1, 1));
 }

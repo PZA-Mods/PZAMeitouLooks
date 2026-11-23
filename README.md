@@ -1,14 +1,16 @@
-# PZA's Post-FX for Meitou (beta 0.5.0)
+# PZA's Post-FX for Meitou (beta 0.6.0)
 
-Formerly **PZA's Looks**. Post-processing effects for Meitou's picture: **Toon** cel lighting, a painted **Kuwahara** look, **N64**
+Formerly **PZA's Looks**. Post-processing effects for Meitou's picture: one-pick **Combos**, **Film Noir**, comic **Halftone** dots, an old **CRT / VHS** screen, **Toon** cel lighting, a painted **Kuwahara** look, **N64**
 distance fog, an ink **Outline**, real **Tilt-Shift** miniature looks, a
 **Fisheye** lens, and retro **pixel looks** (chunky pixel art with a desert palette, the PlayStation look with CRT scanlines, a soft
 240-line N64 look). Each effect has ready-made presets and its own sliders. Menus, text and the pointer stay sharp: the effects are
 drawn under Meitou's interface.
 
-**New in 0.5.0:** Toon (the light banded into flat cel steps inside Meitou's own lighting, so the bands follow the light and never the
-textures, characters and foliage included; **applies at the next start**), Kuwahara (a painted look that keeps edges), N64 (far land fades
-into fog in the scene's own colour). Each has a Default preset that shows it plainly, plus presets with the values of PZA's Dust looks.
+**New in 0.6.0:** Combos (one pick sets several effects: Painted Miniature, Ink Miniature, Retro Cel, CRT Anime, Soft 240 Toon,
+16-Bit Miniature, HD-2D, Diorama, Film Noir, Comic Book, Handheld, Found Footage), Film Noir (Default, Sin City keeping red, Silver
+Screen), Halftone (comic, newspaper, pop art), Screen drawn over everything (an old CRT's wiggle, a lens colour fringe, VHS, VHS Worn),
+the Desert 8 / 32 / Night palettes, and PZA Game Boy (four greens at 144 lines: **a novelty with very limited use**, hard to read in
+play; not recommended for normal play). Vignette, film grain and letterbox stay in Meitou's own graphics settings.
 On the Steam Workshop: [PZA's Post-FX](https://steamcommunity.com/sharedfiles/filedetails/?id=3843020725).
 
 **Download:** the mod zip and its source zip are on the [Releases page](https://github.com/PZA-Mods/PZAMeitouLooks/releases). Building from source: [BUILD.md](BUILD.md).
@@ -21,13 +23,17 @@ that drive it.
 
 | Effect | Presets |
 |---|---|
+| **Combo** | 12 one-pick bundles (see above); changing any effect afterwards shows Custom, Off turns every effect off |
 | **Toon** (at the next start) | PZA Toon - Default, Kenshi, 1, Kenshi 3-Band, Cel, Anime, Wind Waker, PZA PS1 - Toon: flat bands of light (shadow, mid, lit), a tinted shadow and a rim, inside Meitou's lighting |
 | **N64** | PZA N64 - Default (fog in ordinary views, sky clear), Soft 240: far land fades into fog in the scene's own colour |
 | **Kuwahara** | PZA Kuwahara - Default, Painted Miniature, Soft, Heavy: a painted look, areas into strokes, edges kept |
 | **Outline** | PZA Outline, Ink (2 px, darker), Soft (faint), Tilt-Shift: lines where the depth jumps (silhouettes) and where surfaces fold (creases) |
 | **Tilt-Shift** | PZA Miniature (wide sharp band), HD-2D and Diorama (narrow): a tilt-shift from the picture's depth, the followed character sharp from feet to head |
 | **Fisheye** | PZA Fisheye (fills the screen), Fisheye - Round (black corners) |
-| **Pixel look** | PZA Pixel - 1 / 2 / 3 / 1 Night (16-colour desert palette, pattern dither), PZA - PS1 Main, PS1 - Standard, PS1 - CRT (15-bit colour, scanlines, CRT softness, colour smear), Soft 240 - Standard (240 lines, N64 colour), Diorama - Pixel (fine full-colour pixels) |
+| **Film Noir** | PZA Noir - Default, Sin City (keeps red), Silver Screen |
+| **Halftone** | PZA Halftone - Default (comic), Newspaper, Pop Art |
+| **Pixel look** | PZA Pixel - Desert 8 / Desert 32 / Desert Night, PZA Game Boy (novelty, very limited use), PZA Pixel - 1 / 2 / 3 / 1 Night (16-colour desert palette, pattern dither), PZA - PS1 Main, PS1 - Standard, PS1 - CRT (15-bit colour, scanlines, CRT softness, colour smear), Soft 240 - Standard (240 lines, N64 colour), Diorama - Pixel (fine full-colour pixels) |
+| **Screen** (drawn last) | PZA Screen - Default (CRT wiggle), Lens Fringe, VHS, VHS Worn |
 
 "Compare (left half without)" shows the left half of the screen as Meitou draws it, for a before / after.
 
@@ -38,12 +44,15 @@ Pick the preset again to get its values back.
 
 | Group | Settings |
 |---|---|
-| Pixel look | Pixel size (1-16), Palette, Levels, Dither, Contrast, Shadow lift (and only at night), Highlight hold, Scanlines, CRT softness, Colour smear, Sampling, Native lines (Off / 224 / 240 / 480), Keep pure black, Strength |
+| Pixel look | Pixel size (1-16), Palette, Levels, Dither, Contrast, Shadow lift (and only at night), Highlight hold, Scanlines, CRT softness, Colour smear, Sampling, Native lines (Off / 224 / 240 / 480 / 144), Keep pure black, Strength |
 | Tilt-Shift | Sharp band, Falloff, Blur size, Far blur, Near blur, Upright, Band centre, Saturation, Contrast, Strength |
 | Fisheye | Strength, Fit (Fill / Full width), Edge darkening |
 | Outline | Depth sensitivity, Crease sensitivity (0 = no crease lines), Thickness (1-4 px), Strength, Line colour, Line distance |
 | Kuwahara | Brush size, Edge keeping, Strength |
 | N64 | Fog start, Fog end, Fog amount, Fog the sky, Fog colour, Colour strength, Strength |
+| Film Noir | Contrast, Black crush, Tint colour and amount, Keep colour and amount, Edge darkening, Strength |
+| Halftone | Dot size, Screen angle, Shadow start, Paper, Ink colour, Colour dots, Strength |
+| Screen | Colour fringe, Wobble, Roll, Flicker, Tracking, Noise, Colour smear, Softness, Strength |
 | Toon (at the next start) | Strength, Follow the sun, Light reference, Shadow / Highlight edge, Band softness, Shadow / Mid / Lit level, Shadow tint and colour, Rim light and colour, Colour strength |
 
 ## Requires
@@ -51,7 +60,7 @@ Pick the preset again to get its values back.
 on Meitou 0.20.1, 0.21.0 and 0.22.1; there is no upper version cap.
 
 ## Install
-- On the Steam Workshop: subscribe, then tick **PZAPostFX** in Meitou's mod list. Or by hand: unpack `PZALooks.Meitou-0.5.0-beta.zip` into Kenshi's folder (`Kenshi\mods\PZAPostFX\`), then tick **PZAPostFX** in Meitou's mod list.
+- On the Steam Workshop: subscribe, then tick **PZAPostFX** in Meitou's mod list. Or by hand: unpack `PZALooks.Meitou-0.6.0-beta.zip` into Kenshi's folder (`Kenshi\mods\PZAPostFX\`), then tick **PZAPostFX** in Meitou's mod list.
 - Coming from PZA's Looks 0.2.x: untick **PZALooks** and delete `Kenshi\mods\PZALooks\` first, so it is not loaded twice. Your settings
   start fresh in the new folder.
 - No items or world data; load order doesn't matter. Safe to remove at any time.
@@ -71,9 +80,8 @@ Known limits:
 
 ## Planned
 Ideas, no dates:
-- A **CRT wiggle** (the picture rolling and shimmering like an old screen).
 - Russian, Chinese and Japanese texts.
-- More palettes, and macOS (Metal) support.
+- macOS (Metal) support.
 - Perhaps as a built-in part of Meitou one day: the shader source is open for that.
 
 ## Reporting a bug

@@ -44,7 +44,7 @@ $w = New-Object System.IO.BinaryWriter($fs)
 try {
     $w.Write([int]16); $w.Write([int]1)
     Write-FcsString $w "PZA"
-    Write-FcsString $w "PZA's Post-FX for Meitou (code mod pza.looks): pixel art, PS1, Soft 240, Tilt-Shift, Fisheye and Outline passes on Meitou's picture. Holds no records. GPLv3."
+    Write-FcsString $w "PZA's Post-FX for Meitou (code mod pza.looks): pixel art, PS1, Soft 240, Tilt-Shift, Fisheye, Outline, Kuwahara, N64, Toon, Noir, Halftone and Screen passes on Meitou's picture. Holds no records. GPLv3."
     Write-FcsString $w ""; Write-FcsString $w ""
     $w.Write([int]0); $w.Write([int]0)
 } finally { $w.Close() }
@@ -56,13 +56,15 @@ if ($Check) {
     $runDir = if ($RunOn -ne "") { [System.IO.Path]::GetFullPath($RunOn) } else { $MeitouDir }
     if (-not (Test-Path (Join-Path $runDir "MeitouClient.dll"))) { throw "MeitouClient.dll not found in $runDir" }
     Write-Host "check: the mod built against $MeitouDir, run on $runDir"
-    $rt = Join-Path $here "out\checkrt"
-    if (Test-Path $rt) { Remove-Item -Recurse -Force $rt }
-    New-Item -ItemType Directory -Force $rt | Out-Null
-    $patterns = "System*.dll", "Microsoft.*.dll", "mscorlib.dll", "netstandard.dll", "WindowsBase.dll", "coreclr.dll", "clrjit.dll",
-                "clrgc.dll", "hostfxr.dll", "hostpolicy.dll", "Meitou*.dll", "0Harmony.dll", "Bepu*.dll", "DotRecast*.dll", "Silk.NET*.dll",
-                "shaderc_shared.dll"
-    foreach ($p in $patterns) { Copy-Item (Join-Path $runDir $p) $rt -Force }
+    # 2026-11-22 (Meitou 0.22.2-nightly.20261122.2 loads Silk.NET.Core from a module initializer): one runtime folder per release with
+    # EVERY DLL of that release, copied once (a name list missed new dependencies), and the three release runs no longer share one folder
+    $rt = Join-Path $here ("out\checkrt\" + (Split-Path $runDir -Leaf))
+    $stamp = Join-Path $rt "meitou-dir.txt"
+    if (-not (Test-Path $stamp) -or (Get-Content $stamp -Raw).Trim() -ne $runDir) {
+        New-Item -ItemType Directory -Force $rt | Out-Null
+        foreach ($p in "*.dll", "*.so") { Copy-Item (Join-Path $runDir $p) $rt -Force -ErrorAction SilentlyContinue }
+        Set-Content -Path $stamp -Value $runDir -Encoding ascii
+    }
     $stagedDll = Join-Path $stage "PZALooks.Meitou.dll"
     & dotnet build (Join-Path $here "tools\check\check.csproj") -c Release -nologo "-p:MeitouDir=$runDir" "-p:ModDll=$stagedDll" -o (Join-Path $here "out\checkbin")
     if ($LASTEXITCODE -ne 0) { throw "check tool build failed ($LASTEXITCODE)" }

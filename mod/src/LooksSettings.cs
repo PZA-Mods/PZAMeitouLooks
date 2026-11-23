@@ -15,7 +15,8 @@ public sealed class LooksSettings
     /// <summary>The look (Off = Meitou's picture untouched; Custom = the sliders as they are).</summary>
     [Setting(Strings.En.LookLabel, Hint = Strings.En.LookHint, Options = ["Off", "PZA Pixel - 1", "PZA Pixel - 2", "PZA Pixel - 3",
         "PZA Pixel - 1 Night", "PZA - PS1 Main", "PZA PS1 - Standard",
-        "PZA PS1 - CRT", "PZA Soft 240 - Standard", "PZA Diorama - Pixel", "Custom"])]
+        "PZA PS1 - CRT", "PZA Soft 240 - Standard", "PZA Diorama - Pixel", "PZA Pixel - Desert 8", "PZA Pixel - Desert 32",
+        "PZA Pixel - Desert Night", "PZA Game Boy", "Custom"])]
     public string Look { get; set; } = "PZA Pixel - 1";
 
     public bool PixelOn => Look != Looks.Off;
@@ -24,7 +25,7 @@ public sealed class LooksSettings
     public float PxSize { get; set; } = 4.09f;
 
     [Setting(Strings.En.PxPalette, Hint = Strings.En.PxPaletteHint, Options = ["Desert 16", "LEAF 2-bit", "Full colour", "PS1 15-bit", "N64 16-bit",
-        "8-bit 3-3-2"], SubGroup = Strings.En.PixelGroup, VisibleWhen = nameof(PixelOn))]
+        "8-bit 3-3-2", "Desert 8", "Desert 32", "Desert Night 16", "Game Boy"], SubGroup = Strings.En.PixelGroup, VisibleWhen = nameof(PixelOn))]
     public string PxPalette { get; set; } = "Desert 16";
 
     [Setting(Strings.En.PxLevels, Hint = Strings.En.PxLevelsHint, Min = 2, Max = 32, Step = 1, SubGroup = Strings.En.PixelGroup, VisibleWhen = nameof(PixelOn))]
@@ -57,7 +58,7 @@ public sealed class LooksSettings
     [Setting(Strings.En.PxSampling, Hint = Strings.En.PxSamplingHint, Options = ["Centre", "Cell average"], SubGroup = Strings.En.PixelGroup, VisibleWhen = nameof(PixelOn))]
     public string PxSampling { get; set; } = "Centre";
 
-    [Setting(Strings.En.PxNative, Hint = Strings.En.PxNativeHint, Options = ["Off", "224 lines", "240 lines", "480 lines"], SubGroup = Strings.En.PixelGroup, VisibleWhen = nameof(PixelOn))]
+    [Setting(Strings.En.PxNative, Hint = Strings.En.PxNativeHint, Options = ["Off", "224 lines", "240 lines", "480 lines", "144 lines"], SubGroup = Strings.En.PixelGroup, VisibleWhen = nameof(PixelOn))]
     public string PxNative { get; set; } = "Off";
 
     [Setting(Strings.En.PxKeepBlack, Hint = Strings.En.PxKeepBlackHint, SubGroup = Strings.En.PixelGroup, VisibleWhen = nameof(PixelOn))]
@@ -264,6 +265,116 @@ public sealed class LooksSettings
     [Setting(Strings.En.TnSaturation, Hint = Strings.En.TnSaturationHint, Min = 0, Max = 2, Step = 0.01, SubGroup = Strings.En.TnGroup, VisibleWhen = nameof(ToonOn))]
     public float TnSaturation { get; set; } = 1.15f;
 
+    // ---- Combo (0.6.0) ----
+    /// <summary>0.6.0: one pick for several effects. Picking a combo sets the other lists; changing any of them afterwards shows Custom.</summary>
+    [Setting(Strings.En.ComboLabel, Hint = Strings.En.ComboHint, Options = ["Off", "PZA Combo - Painted Miniature", "PZA Combo - Ink Miniature",
+        "PZA Combo - Retro Cel", "PZA Combo - CRT Anime", "PZA Combo - Soft 240 Toon", "PZA Combo - 16-Bit Miniature", "PZA Combo - HD-2D",
+        "PZA Combo - Diorama", "PZA Combo - Film Noir", "PZA Combo - Comic Book", "PZA Combo - Handheld", "PZA Combo - Found Footage", "Custom"])]
+    public string Combo { get; set; } = "Off";
+
+    // ---- Noir (0.6.0) ----
+    [Setting(Strings.En.NoirLabel, Hint = Strings.En.NoirHint, Options = ["Off", "PZA Noir - Default", "PZA Noir - Sin City", "PZA Noir - Silver Screen", "Custom"])]
+    public string Noir { get; set; } = "Off";
+
+    public bool NoirOn => Noir != Looks.Off;
+
+    [Setting(Strings.En.NrContrast, Hint = Strings.En.NrContrastHint, Min = 0.5, Max = 2.5, Step = 0.05, SubGroup = Strings.En.NrGroup, VisibleWhen = nameof(NoirOn))]
+    public float NrContrast { get; set; } = 1.45f;
+
+    [Setting(Strings.En.NrCrush, Hint = Strings.En.NrCrushHint, Min = 0, Max = 0.5, Step = 0.01, SubGroup = Strings.En.NrGroup, VisibleWhen = nameof(NoirOn))]
+    public float NrCrush { get; set; } = 0.08f;
+
+    [Setting(Strings.En.NrTintR, Hint = Strings.En.NrTintHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NrGroup, VisibleWhen = nameof(NoirOn))]
+    public float NrTintR { get; set; } = 0.85f;
+
+    [Setting(Strings.En.NrTintG, Hint = Strings.En.NrTintHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NrGroup, VisibleWhen = nameof(NoirOn))]
+    public float NrTintG { get; set; } = 0.9f;
+
+    [Setting(Strings.En.NrTintB, Hint = Strings.En.NrTintHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NrGroup, VisibleWhen = nameof(NoirOn))]
+    public float NrTintB { get; set; } = 1f;
+
+    [Setting(Strings.En.NrTintAmount, Hint = Strings.En.NrTintAmountHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NrGroup, VisibleWhen = nameof(NoirOn))]
+    public float NrTintAmount { get; set; } = 0.2f;
+
+    [Setting(Strings.En.NrKeep, Hint = Strings.En.NrKeepHint, Options = ["None", "Red", "Amber", "Green", "Blue"], SubGroup = Strings.En.NrGroup, VisibleWhen = nameof(NoirOn))]
+    public string NrKeep { get; set; } = "None";
+
+    [Setting(Strings.En.NrKeepAmount, Hint = Strings.En.NrKeepAmountHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NrGroup, VisibleWhen = nameof(NoirOn))]
+    public float NrKeepAmount { get; set; } = 0f;
+
+    [Setting(Strings.En.NrEdge, Hint = Strings.En.NrEdgeHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NrGroup, VisibleWhen = nameof(NoirOn))]
+    public float NrEdge { get; set; } = 0.4f;
+
+    [Setting(Strings.En.Strength, Hint = Strings.En.NrStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.NrGroup, VisibleWhen = nameof(NoirOn))]
+    public float NrStrength { get; set; } = 1f;
+
+    // ---- Halftone (0.6.0) ----
+    [Setting(Strings.En.HalftoneLabel, Hint = Strings.En.HalftoneHint, Options = ["Off", "PZA Halftone - Default", "PZA Halftone - Newspaper", "PZA Halftone - Pop Art", "Custom"])]
+    public string Halftone { get; set; } = "Off";
+
+    public bool HalftoneOn => Halftone != Looks.Off;
+
+    [Setting(Strings.En.HtDotSize, Hint = Strings.En.HtDotSizeHint, Min = 2, Max = 16, Step = 0.5, SubGroup = Strings.En.HtGroup, VisibleWhen = nameof(HalftoneOn))]
+    public float HtDotSize { get; set; } = 6f;
+
+    [Setting(Strings.En.HtAngle, Hint = Strings.En.HtAngleHint, Min = 0, Max = 90, Step = 1, SubGroup = Strings.En.HtGroup, VisibleWhen = nameof(HalftoneOn))]
+    public float HtAngle { get; set; } = 45f;
+
+    [Setting(Strings.En.HtThreshold, Hint = Strings.En.HtThresholdHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.HtGroup, VisibleWhen = nameof(HalftoneOn))]
+    public float HtThreshold { get; set; } = 0.55f;
+
+    [Setting(Strings.En.HtPaper, Hint = Strings.En.HtPaperHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.HtGroup, VisibleWhen = nameof(HalftoneOn))]
+    public float HtPaper { get; set; } = 0f;
+
+    [Setting(Strings.En.HtInkR, Hint = Strings.En.HtInkHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.HtGroup, VisibleWhen = nameof(HalftoneOn))]
+    public float HtInkR { get; set; } = 0.08f;
+
+    [Setting(Strings.En.HtInkG, Hint = Strings.En.HtInkHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.HtGroup, VisibleWhen = nameof(HalftoneOn))]
+    public float HtInkG { get; set; } = 0.06f;
+
+    [Setting(Strings.En.HtInkB, Hint = Strings.En.HtInkHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.HtGroup, VisibleWhen = nameof(HalftoneOn))]
+    public float HtInkB { get; set; } = 0.07f;
+
+    [Setting(Strings.En.HtColour, Hint = Strings.En.HtColourHint, SubGroup = Strings.En.HtGroup, VisibleWhen = nameof(HalftoneOn))]
+    public bool HtColour { get; set; }
+
+    [Setting(Strings.En.Strength, Hint = Strings.En.HtStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.HtGroup, VisibleWhen = nameof(HalftoneOn))]
+    public float HtStrength { get; set; } = 0.9f;
+
+    // ---- Screen (0.6.0) ----
+    [Setting(Strings.En.ScreenLabel, Hint = Strings.En.ScreenHint, Options = ["Off", "PZA Screen - Default", "PZA Screen - Lens Fringe", "PZA Screen - VHS",
+        "PZA Screen - VHS Worn", "Custom"])]
+    public string Screen { get; set; } = "Off";
+
+    public bool ScreenOn => Screen != Looks.Off;
+
+    [Setting(Strings.En.ScFringe, Hint = Strings.En.ScFringeHint, Min = 0, Max = 0.01, Step = 0.0005, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
+    public float ScFringe { get; set; } = 0.0015f;
+
+    [Setting(Strings.En.ScWobble, Hint = Strings.En.ScWobbleHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
+    public float ScWobble { get; set; } = 0.35f;
+
+    [Setting(Strings.En.ScRoll, Hint = Strings.En.ScRollHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
+    public float ScRoll { get; set; } = 0.15f;
+
+    [Setting(Strings.En.ScFlicker, Hint = Strings.En.ScFlickerHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
+    public float ScFlicker { get; set; } = 0.25f;
+
+    [Setting(Strings.En.ScTracking, Hint = Strings.En.ScTrackingHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
+    public float ScTracking { get; set; } = 0f;
+
+    [Setting(Strings.En.ScNoise, Hint = Strings.En.ScNoiseHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
+    public float ScNoise { get; set; } = 0.08f;
+
+    [Setting(Strings.En.ScBleed, Hint = Strings.En.ScBleedHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
+    public float ScBleed { get; set; } = 0f;
+
+    [Setting(Strings.En.ScSoften, Hint = Strings.En.ScSoftenHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
+    public float ScSoften { get; set; } = 0.15f;
+
+    [Setting(Strings.En.Strength, Hint = Strings.En.ScStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
+    public float ScStrength { get; set; } = 1f;
+
     // ---- Compare ---------------------------------------------------------------------------------------------------------------------------
     /// <summary>Compare: the left half of the screen as Meitou draws it, the right half with the look.</summary>
     [Setting(Strings.En.SplitLabel, Hint = Strings.En.SplitHint)]
@@ -340,6 +451,66 @@ static class Strings
         public const string TnRimColourHint = "The rim light's colour.";
         public const string TnSaturation = "Colour strength";
         public const string TnSaturationHint = "Saturation of the surfaces' own colours (1 = unchanged).";
+        public const string ComboLabel = "Combo";
+        public const string ComboHint = "One pick for several effects at once (PZA's Dust combos and new ones). Changing any effect afterwards shows Custom here; picking Off turns every effect off. Combos with Toon: Toon applies at the next start.";
+        public const string NoirLabel = "Film noir";
+        public const string NoirHint = "Hard black and white: deep blacks, a silver tint, darker edges. Sin City keeps one colour (red). Pairs with Meitou's own film grain and vignette (Settings > Graphics).";
+        public const string NrGroup = "Film noir";
+        public const string NrContrast = "Contrast";
+        public const string NrContrastHint = "Black-and-white contrast (1 = as it is).";
+        public const string NrCrush = "Black crush";
+        public const string NrCrushHint = "How much of the dark end turns pure black.";
+        public const string NrTintR = "Tint red";
+        public const string NrTintG = "Tint green";
+        public const string NrTintB = "Tint blue";
+        public const string NrTintHint = "The black and white's tint colour (silver blue, warm print...).";
+        public const string NrTintAmount = "Tint amount";
+        public const string NrTintAmountHint = "How much of the tint colour shows.";
+        public const string NrKeep = "Keep colour";
+        public const string NrKeepHint = "One colour that stays in colour (Sin City's red).";
+        public const string NrKeepAmount = "Keep amount";
+        public const string NrKeepAmountHint = "How strongly the kept colour shows.";
+        public const string NrEdge = "Edge darkening";
+        public const string NrEdgeHint = "Darker corners, like an old film print.";
+        public const string NrStrengthHint = "Mixes the noir with Meitou's picture (1 = full noir).";
+        public const string HalftoneLabel = "Halftone";
+        public const string HalftoneHint = "Printed dots like a comic book or newspaper. Default = ink dots in the shadows; Newspaper = every tone as dots on paper; Pop Art = cyan, magenta and yellow dots.";
+        public const string HtGroup = "Halftone";
+        public const string HtDotSize = "Dot size";
+        public const string HtDotSizeHint = "Dot spacing in pixels at 1080 lines.";
+        public const string HtAngle = "Screen angle";
+        public const string HtAngleHint = "The angle of the dot rows, in degrees.";
+        public const string HtThreshold = "Shadow start";
+        public const string HtThresholdHint = "Where the dots start: low = only the darkest shadows, 1 = every tone.";
+        public const string HtPaper = "Paper";
+        public const string HtPaperHint = "0 = the picture shows between the dots, 1 = flat paper.";
+        public const string HtInkR = "Ink red";
+        public const string HtInkG = "Ink green";
+        public const string HtInkB = "Ink blue";
+        public const string HtInkHint = "The ink colour of single-colour dots.";
+        public const string HtColour = "Colour dots";
+        public const string HtColourHint = "Cyan, magenta and yellow dots instead of one ink.";
+        public const string HtStrengthHint = "Mixes the dots with Meitou's picture (1 = full).";
+        public const string ScreenLabel = "Screen";
+        public const string ScreenHint = "The screen itself, drawn over everything: Default = an old CRT's wiggle; Lens Fringe = colour fringing at the edges; VHS and VHS Worn = tape.";
+        public const string ScGroup = "Screen";
+        public const string ScFringe = "Colour fringe";
+        public const string ScFringeHint = "Red and blue drift apart toward the edges (chromatic aberration).";
+        public const string ScWobble = "Wobble";
+        public const string ScWobbleHint = "The lines wobble sideways like an old CRT.";
+        public const string ScRoll = "Roll";
+        public const string ScRollHint = "The picture drifts slowly up and down (vertical hold).";
+        public const string ScFlicker = "Flicker";
+        public const string ScFlickerHint = "The brightness flickers.";
+        public const string ScTracking = "Tracking";
+        public const string ScTrackingHint = "A torn band rolls down the picture, like a worn tape.";
+        public const string ScNoise = "Noise";
+        public const string ScNoiseHint = "Moving snow over the picture.";
+        public const string ScBleed = "Colour smear";
+        public const string ScBleedHint = "Colour smears sideways while the outlines stay sharp, like tape.";
+        public const string ScSoften = "Softness";
+        public const string ScSoftenHint = "A softer, blurrier picture.";
+        public const string ScStrengthHint = "Mixes the screen effect with Meitou's picture (1 = full).";
         public const string SplitLabel = "Compare (left half without)";
         public const string SplitHint = "Shows the left half of the screen without the looks, for a before / after.";
 
@@ -349,7 +520,7 @@ static class Strings
         public const string PxSize = "Pixel size";
         public const string PxSizeHint = "Screen pixels per art pixel at 1080 lines (scaled with your screen height). Bigger = chunkier.";
         public const string PxPalette = "Palette";
-        public const string PxPaletteHint = "Desert 16 = PZA's 16 desert colours; LEAF 2-bit = 4 shades; Full colour = every hue with fewer levels; PS1 15-bit, N64 16-bit, 8-bit 3-3-2 = those consoles' colour depths.";
+        public const string PxPaletteHint = "Desert 16 = PZA's 16 desert colours; LEAF 2-bit = 4 shades; Full colour = every hue with fewer levels; PS1 15-bit, N64 16-bit, 8-bit 3-3-2 = those consoles' colour depths; Desert 8 / 32 / Night 16 = PZA's other desert palettes; Game Boy = its four greens.";
         public const string PxLevels = "Levels";
         public const string PxLevelsHint = "Steps per colour channel for the Full colour palette (fewer = more banding).";
         public const string PxDither = "Dither";

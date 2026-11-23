@@ -45,6 +45,16 @@ public sealed class LooksMod : IMod
 
     static void TestOverrides()
     {
+        // 0.6.0: PZA_LOOKS_COMBO first (it sets the other lists; a single list's variable below still wins)
+        if (Environment.GetEnvironmentVariable("PZA_LOOKS_COMBO") is { Length: > 0 } combo)
+        {
+            if (Combos.Names.Contains(combo, StringComparer.Ordinal) && combo != Looks.Custom)
+            {
+                PixelPass.Settings.Combo = combo;
+                LookValues.ApplyCombo(null, PixelPass.Settings);
+            }
+            Log.Line($"PZA_LOOKS_COMBO={combo}: combo for this run '{PixelPass.Settings.Combo}'");
+        }
         if (Environment.GetEnvironmentVariable("PZA_LOOKS_LOOK") is { Length: > 0 } look)
         {
             if (look == Looks.Off || Looks.Find(look) is not null) PixelPass.Settings.Look = look;
@@ -76,7 +86,9 @@ public sealed class LooksMod : IMod
         }
         // 0.5.0: Kuwahara, N64, Toon by name for this run (as PZA_LOOKS_OUTLINE)
         foreach (var (env, list, names) in new[] { ("PZA_LOOKS_KUWAHARA", nameof(LooksSettings.Kuwahara), Kuwaharas.Names),
-                     ("PZA_LOOKS_N64", nameof(LooksSettings.N64), N64s.Names), ("PZA_LOOKS_TOON", nameof(LooksSettings.Toon), Toons.Names) })
+                     ("PZA_LOOKS_N64", nameof(LooksSettings.N64), N64s.Names), ("PZA_LOOKS_TOON", nameof(LooksSettings.Toon), Toons.Names),
+                     ("PZA_LOOKS_NOIR", nameof(LooksSettings.Noir), Noirs.Names), ("PZA_LOOKS_HALFTONE", nameof(LooksSettings.Halftone), Halftones.Names),
+                     ("PZA_LOOKS_SCREEN", nameof(LooksSettings.Screen), Screens.Names) })
         {
             if (Environment.GetEnvironmentVariable(env) is not { Length: > 0 } pick) continue;
             var prop = typeof(LooksSettings).GetProperty(list)!;
