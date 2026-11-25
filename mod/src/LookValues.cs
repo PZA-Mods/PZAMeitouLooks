@@ -157,6 +157,7 @@ public static class LookValues
                     Set(group, s, nameof(s.OlGreen), o.Green);
                     Set(group, s, nameof(s.OlBlue), o.Blue);
                     Set(group, s, nameof(s.OlMaxDepth), o.MaxDepth);
+                    Set(group, s, nameof(s.OlDebug), o.Debug);
                 });
                 break;
             case nameof(LooksSettings.Kuwahara) when Kuwaharas.Find(s.Kuwahara) is { } k:
@@ -315,11 +316,12 @@ public static class LookValues
     public static OutlineLook? Outline(LooksSettings s) => s.Outline == Looks.Off || !Outlines.Names.Contains(s.Outline) ? null : new(
         s.Outline,
         F(s.OlDepth, 0.0005f, 0.05f, 0.003f),
-        F(s.OlNormal, 0, 1, 0.8f),
+        F(s.OlNormal, 0, 2, 0.8f),
         Math.Clamp(s.OlThickness, 1, 4),
         F(s.OlStrength, 0, 1, 0.8f),
         F(s.OlRed, 0, 1, 0), F(s.OlGreen, 0, 1, 0), F(s.OlBlue, 0, 1, 0),
-        F(s.OlMaxDepth, 0.01f, 1, 0.5f));
+        F(s.OlMaxDepth, 0.01f, 1, 0.5f),
+        s.OlDebug);
 
     public static KuwaharaLook? Kuwahara(LooksSettings s) => s.Kuwahara == Looks.Off || !Kuwaharas.Names.Contains(s.Kuwahara) ? null : new(
         s.Kuwahara,

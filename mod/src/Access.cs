@@ -32,6 +32,9 @@ static class Access
     static MethodInfo? s_draw;
     /// <summary>For Tilt-Shift: PostProcess.SceneDepthTarget (Target2D?), ViewRotation (Matrix4x4), FovY (float), Planes (Vector2).</summary>
     static PropertyInfo? s_depth, s_viewRotation, s_fovY, s_planes;
+    /// <summary>Optional (Outline surface normals): PostProcess._giAlbedo (Target2D?) and GiAlbedoTarget (GpuTexture? — non-null when populated this frame).</summary>
+    static FieldInfo? s_giAlbedo;
+    static PropertyInfo? s_giAlbedoTarget;
 
     /// <summary>Resolves every member; returns the missing ones (empty = all there).</summary>
     public static List<string> ResolveAll()
@@ -55,6 +58,8 @@ static class Access
         s_viewRotation = pp.GetProperty("ViewRotation", Inst);
         s_fovY = pp.GetProperty("FovY", Inst);
         s_planes = pp.GetProperty("Planes", Inst);
+        s_giAlbedo = pp.GetField("_giAlbedo", Inst);
+        s_giAlbedoTarget = pp.GetProperty("GiAlbedoTarget", Inst);
         Need(missing, s_draw, "PostProcess.Draw(LegacyProgram, Target2D)");
         Need(missing, s_depth is not null && s_depth.PropertyType == target2D, "PostProcess.SceneDepthTarget");
         Need(missing, s_viewRotation?.PropertyType == typeof(System.Numerics.Matrix4x4), "PostProcess.ViewRotation");
@@ -105,4 +110,11 @@ static class Access
     public static float FovY(PostProcess pp) => (float)s_fovY!.GetValue(pp)!;
 
     public static System.Numerics.Vector2 Planes(PostProcess pp) => (System.Numerics.Vector2)s_planes!.GetValue(pp)!;
+
+    /// <summary>The packed surface target (_giAlbedo, Rgba32Ui with octahedral world normals) when GI or SSR populated it this frame; null otherwise.</summary>
+    public static object? SurfaceTarget(PostProcess pp)
+    {
+        if (s_giAlbedo is null || s_giAlbedoTarget is null) return null;
+        return s_giAlbedoTarget.GetValue(pp) is not null ? s_giAlbedo.GetValue(pp) : null;
+    }
 }

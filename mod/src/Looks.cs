@@ -115,25 +115,27 @@ public static class Fisheyes
     public static FisheyeLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
 }
 
-/// <summary>0.4.0: one Outline, our own edge pass (the Dust Outline effect's settings as a guide; the maths is ours, OutlineShader).</summary>
+/// <summary>0.4.0 / 0.7.0: one Outline, our own edge pass with full Dust Rendering Framework parity (OutlineShader).</summary>
 public sealed record OutlineLook(
     string Name,
     float Depth,       // depth sensitivity: the inverse-depth jump (share of the centre's) that starts a line; a line is full at 1.5x
-    float Normal,      // crease sensitivity: 1 - cos of the fold between neighbouring normals (0 = no crease lines)
+    float Normal,      // crease sensitivity: Roberts Cross sum of diagonal normal differences (0 = no crease lines, 0..2)
     int Thickness,     // tap distance in depth pixels (1..4)
     float Strength,    // mix toward the colour
     float Red, float Green, float Blue,
-    float MaxDepth);   // share of the view's far plane beyond which no line is drawn
+    float MaxDepth,    // share of the 5,000-unit reference distance (Ultra 0.5 = 2,500 units, faded smoothly over the outer 35%)
+    bool Debug = false);   // Red = depth edges, Green = normal/crease edges (Dust's DebugView)
 
 public static class Outlines
 {
-    /// <summary>Every Outline, in the Settings page's order (after Off).</summary>
+    /// <summary>Every Outline, in the Settings page's order (after Off). PZA Outline = PZA Base - Ultra's exact values.</summary>
     public static readonly OutlineLook[] All =
     [
         new("PZA Outline", 0.003f, 0.8f, 1, 0.8f, 0f, 0f, 0f, 0.5f),
         new("PZA Outline - Ink", 0.003f, 0.6f, 2, 1.0f, 0f, 0f, 0f, 0.3f),
         new("PZA Outline - Soft", 0.003f, 0.8f, 1, 0.6f, 0f, 0f, 0f, 0.5f),
         new("PZA Outline - Tilt-Shift", 0.005f, 0.7f, 1, 0.75f, 0f, 0f, 0f, 0.5f),
+        new("PZA Outline - Stylized", 0.01f, 1.0f, 1, 0.6f, 0f, 0f, 0f, 1.0f),
     ];
 
     public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];

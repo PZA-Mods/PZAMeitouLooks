@@ -17,7 +17,7 @@ public sealed class LooksSettings
         "PZA Pixel - 1 Night", "PZA - PS1 Main", "PZA PS1 - Standard",
         "PZA PS1 - CRT", "PZA Soft 240 - Standard", "PZA Diorama - Pixel", "PZA Pixel - Desert 8", "PZA Pixel - Desert 32",
         "PZA Pixel - Desert Night", "PZA Game Boy", "Custom"])]
-    public string Look { get; set; } = "PZA Pixel - 1";
+    public string Look { get; set; } = "Off";
 
     public bool PixelOn => Look != Looks.Off;
 
@@ -120,10 +120,10 @@ public sealed class LooksSettings
     [Setting(Strings.En.FeEdgeDark, Hint = Strings.En.FeEdgeDarkHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.FisheyeGroup, VisibleWhen = nameof(FisheyeOn))]
     public float FeEdgeDark { get; set; } = 0.25f;
 
-    // ---- Outline (0.4.0) -------------------------------------------------------------------------------------------------------------------
-    /// <summary>0.4.0: PZA Outline, first in the chain (on the scene as Meitou draws it, before Tilt-Shift, Fisheye and the look). Off = none.</summary>
+    // ---- Outline (0.4.0 / 0.7.0) -----------------------------------------------------------------------------------------------------------
+    /// <summary>0.4.0 / 0.7.0: PZA Outline, first in the chain (on the scene as Meitou draws it, before Tilt-Shift, Fisheye and the look). Off = none.</summary>
     [Setting(Strings.En.OutlineLabel, Hint = Strings.En.OutlineHint, Options = ["Off", "PZA Outline", "PZA Outline - Ink", "PZA Outline - Soft",
-        "PZA Outline - Tilt-Shift", "Custom"])]
+        "PZA Outline - Tilt-Shift", "PZA Outline - Stylized", "Custom"])]
     public string Outline { get; set; } = "Off";
 
     public bool OutlineOn => Outline != Looks.Off;
@@ -131,7 +131,7 @@ public sealed class LooksSettings
     [Setting(Strings.En.OlDepth, Hint = Strings.En.OlDepthHint, Min = 0.0005, Max = 0.05, Step = 0.0005, SubGroup = Strings.En.OutlineGroup, VisibleWhen = nameof(OutlineOn))]
     public float OlDepth { get; set; } = 0.003f;
 
-    [Setting(Strings.En.OlNormal, Hint = Strings.En.OlNormalHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.OutlineGroup, VisibleWhen = nameof(OutlineOn))]
+    [Setting(Strings.En.OlNormal, Hint = Strings.En.OlNormalHint, Min = 0, Max = 2, Step = 0.01, SubGroup = Strings.En.OutlineGroup, VisibleWhen = nameof(OutlineOn))]
     public float OlNormal { get; set; } = 0.8f;
 
     [Setting(Strings.En.OlThickness, Hint = Strings.En.OlThicknessHint, Min = 1, Max = 4, Step = 1, SubGroup = Strings.En.OutlineGroup, VisibleWhen = nameof(OutlineOn))]
@@ -151,6 +151,9 @@ public sealed class LooksSettings
 
     [Setting(Strings.En.OlMaxDepth, Hint = Strings.En.OlMaxDepthHint, Min = 0.01, Max = 1, Step = 0.01, SubGroup = Strings.En.OutlineGroup, VisibleWhen = nameof(OutlineOn))]
     public float OlMaxDepth { get; set; } = 0.5f;
+
+    [Setting(Strings.En.OlDebug, Hint = Strings.En.OlDebugHint, SubGroup = Strings.En.OutlineGroup, VisibleWhen = nameof(OutlineOn))]
+    public bool OlDebug { get; set; }
 
     // ---- Kuwahara (0.5.0) ----
     /// <summary>0.5.0: PZA Kuwahara, the painted look (non-linear smoothing that keeps edges). Off = none.</summary>
@@ -392,7 +395,7 @@ static class Strings
         public const string FisheyeLabel = "Fisheye";
         public const string FisheyeHint = "Bends the view like a fisheye lens. Fisheye fills the whole screen; Round shows everything across with black corners, like a real round fisheye. Pairs with PZA's Camera's 0.5x lens.";
         public const string OutlineLabel = "Outline";
-        public const string OutlineHint = "Draws lines round characters, buildings and creases from the scene's depth, like ink on a drawing. Ink = thick and dark, Soft = faint, Tilt-Shift = for use with Tilt-Shift. Picking one fills the Outline sliders below.";
+        public const string OutlineHint = "Draws lines round characters, buildings and creases from the scene's depth and normals, matching Dust's Outline. PZA Outline = Ultra preset, Ink = thick and dark, Soft = faint, Tilt-Shift = for Tilt-Shift, Stylized = lighter creases. Picking one fills the Outline sliders below.";
         public const string KuwaharaLabel = "Kuwahara";
         public const string KuwaharaHint = "A painted look: smooths areas into strokes while keeping edges sharp (non-linear smoothing). Default = plain strokes; Painted Miniature = the Dust preset; Heavy = big strokes (costs more). Picking one fills the Kuwahara sliders below.";
         public const string KwGroup = "Kuwahara";
@@ -588,6 +591,8 @@ static class Strings
         public const string OlBlue = "Line blue";
         public const string OlColourHint = "The line colour (0, 0, 0 = black).";
         public const string OlMaxDepth = "Line distance";
-        public const string OlMaxDepthHint = "How far away lines are still drawn, as a share of the view distance (1 = everything).";
+        public const string OlMaxDepthHint = "How far away lines are drawn (0.5 = 2,500 units, 1 = 5,000 units), fading smoothly before the cutoff so distant mountains stay clean.";
+        public const string OlDebug = "Debug view";
+        public const string OlDebugHint = "Shows raw edge detection instead of the scene: red = depth edges, green = normal/crease edges (matching Dust's Debug View).";
     }
 }

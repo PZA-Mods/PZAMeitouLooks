@@ -1,133 +1,255 @@
 // PZA's Post-FX for Meitou. Author: PZA. Licence: GPLv3 or later.
-// 0.4.0: PZA Outline, our own edge pass from the scene depth (the Dust Outline effect's settings were the guide; this maths is written fresh).
-// Two kinds of line, the stronger one wins:
-// - DEPTH lines (silhouettes): the Laplacian of INVERSE view depth (1/z) over the four neighbours, divided by the centre's 1/z. 1/z is linear
-//   across the screen on any flat surface, so a floor seen at a grazing angle gives exactly 0 (a plain depth Laplacian draws lines all over a
-//   far floor); a jump between a character and what is behind it gives a big value. The line starts at the threshold and is full at 1.5x.
-// - CREASE lines (folds): normals rebuilt from depth on a 2x2 block (forward differences of view positions), Roberts cross between the
-//   diagonals, 1 - cos of the fold. Threshold 0 = no crease lines.
-// Sky is never lined (a character against the sky still is: its neighbour's 1/z is 0). Beyond MaxDepth x the far plane nothing is lined.
-// Runs FIRST (before Tilt-Shift, Fisheye and the look), on the picture the depth belongs to: the lines then blur, bend and pixelate with it.
-// Depth is at the render size (it can differ from the display with an upscaler): taps step in depth pixels, Thickness of them.
+// 0.4.0 / 0.7.0: PZA Outline, our own edge pass with full Dust Rendering Framework parity (the Dust Outline settings were the guide; all maths
+// is written fresh in GLSL 330):
+// - DEPTH lines (silhouettes): point-sampled texelFetch Laplacian of INVERSE view depth (1/z) over the four neighbours, divided by the centre's
+//   1/z. 1/z is linear on any flat surface, so a grazing floor gives 0; a silhouette jump gives a strong line; point sampling avoids bilinear
+//   depth smearing under upscalers (FSR/DLSS/TAA).
+// - CREASE / NORMAL lines (folds): Roberts Cross sum of both diagonal normal differences across a Thickness-sized quad. When Meitou's packed
+//   surface target (_giAlbedo, GI/SSR) is populated, reads the real octahedral world-space shading normals directly (zero silhouette halo, zero
+//   far-terrain noise). Otherwise (or on pixels without a surface normal, e.g. foliage/water), falls back to minimum-depth-delta view-space
+//   normals with depth-jump rejection so silhouettes never tilt the normal or create thick ghost creases.
+// - DISTANCE CUTOFF & FADE: MaxDepth scales a fixed 5,000-unit reference distance (capped to the view's far plane), so Ultra's 0.5 = 2,500 units
+//   (active play area and town, never distant mountains 30,000+ units away on Meitou's 60,000+ far plane), with a smooth fade over the outer 35%.
+// - DEBUG VIEW: Red = depth edges, Green = normal/crease edges (matching Dust's DebugView).
 namespace PZA.Looks.Meitou;
 
 public static class OutlineShader
 {
-    public static string Fragment(string depthConvention) => "#version 330 core\n" + depthConvention + Body;
+    /// <summary>Reference distance (world units) for MaxDepth = 1.0: 5,000 units (~500 m), so Ultra's 0.5 = 2,500 units (whole town &amp; mid-ground,
+    /// without outlining distant mountains on Meitou's 60,000+ view distance).</summary>
+    public const float ReferenceFar = 5000f;
 
-    const string Body = """
+    public static string Fragment(string depthConvention, bool useSurface = false) =>
+        "#version 330 core\n" + depthConvention + Head + (useSurface ? SurfaceHelper : DepthOnlyHelper) + Tail;
+
+    const string Head = """
         in vec2 vUv;
         out vec4 fragColour;
         uniform sampler2D uImage;     // the picture so far (LDR, display size)
         uniform sampler2D uDepth;     // the scene depth (render size)
         uniform vec2 uPlanes;
-        uniform float uDepthThr, uNormalThr, uThickness, uStrength, uMaxDepth, uTanHalfFov, uAspect;
+        uniform float uDepthThr, uNormalThr, uThickness, uStrength, uMaxDepth, uRefFar, uTanHalfFov, uAspect;
         uniform vec3 uColour;
         uniform int uFlipY, uSplit, uDebug;
 
-        // tex coordinates of a top-down picture point; view depth (sky = 0 marks it)
-        vec2 TexOf(vec2 pic) { return uFlipY != 0 ? vec2(pic.x, 1.0 - pic.y) : pic; }
-        float ViewZ(vec2 pic)
+        float ViewZAt(ivec2 px, ivec2 size)
         {
-            float d = textureLod(uDepth, TexOf(pic), 0.0).r;
+            float d = texelFetch(uDepth, clamp(px, ivec2(0), size - 1), 0).r;
             return depthIsSky(d) ? 0.0 : depthViewZ(d, uPlanes);
         }
         float InvZ(float z) { return z > 0.0 ? 1.0 / max(z, 1e-3) : 0.0; }   // fuzz 2026-11-19: a near-zero depth overflowed 1/z (NaN lines)
-        vec3 ViewPos(vec2 pic, float z)
+        vec3 ViewPosAt(ivec2 px, ivec2 size, float z)
         {
-            return vec3((pic.x * 2.0 - 1.0) * uAspect * uTanHalfFov, (1.0 - pic.y * 2.0) * uTanHalfFov, 1.0) * z;
+            vec2 uv = (vec2(px) + 0.5) / vec2(size);
+            float picY = uFlipY != 0 ? 1.0 - uv.y : uv.y;
+            return vec3((uv.x * 2.0 - 1.0) * uAspect * uTanHalfFov, (1.0 - picY * 2.0) * uTanHalfFov, 1.0) * z;
         }
 
-        float Edge(vec2 pic)
+        // Unit-safe normal difference (1 - dot(na, nb), exact 0 for identical inputs, 0 for degenerate/zero normals).
+        float NormalDiff(vec3 a, vec3 b)
         {
-            vec2 px = uThickness / vec2(textureSize(uDepth, 0));
-            float zC = ViewZ(pic);
-            if (zC <= 0.0 || zC > uMaxDepth * uPlanes.y) return 0.0;
-            float zL = ViewZ(pic - vec2(px.x, 0.0)), zR = ViewZ(pic + vec2(px.x, 0.0));
-            float zU = ViewZ(pic - vec2(0.0, px.y)), zD = ViewZ(pic + vec2(0.0, px.y));
+            float aa = dot(a, a), bb = dot(b, b);
+            if (aa <= 1e-4 || bb <= 1e-4) return 0.0;
+            vec3 d = a * inversesqrt(aa) - b * inversesqrt(bb);
+            return 0.5 * dot(d, d);
+        }
+
+        // Silhouette-safe view-space normal from depth: picks the nearer neighbour on each axis so edges do not tilt the normal.
+        vec3 DepthNormalAt(ivec2 p, ivec2 size, float z)
+        {
+            if (z <= 0.0) return vec3(0.0);
+            float wC = InvZ(z);
+            float zL = ViewZAt(p - ivec2(1, 0), size), zR = ViewZAt(p + ivec2(1, 0), size);
+            float zU = ViewZAt(p - ivec2(0, 1), size), zD = ViewZAt(p + ivec2(0, 1), size);
+            float dL = zL > 0.0 ? abs(InvZ(zL) - wC) : 1e30;
+            float dR = zR > 0.0 ? abs(InvZ(zR) - wC) : 1e30;
+            float dU = zU > 0.0 ? abs(InvZ(zU) - wC) : 1e30;
+            float dD = zD > 0.0 ? abs(InvZ(zD) - wC) : 1e30;
+            if (min(dL, dR) > 0.1 * wC || min(dU, dD) > 0.1 * wC) return vec3(0.0);
+            vec3 pC = ViewPosAt(p, size, z);
+            vec3 dx = dR < dL ? ViewPosAt(p + ivec2(1, 0), size, zR) - pC : pC - ViewPosAt(p - ivec2(1, 0), size, zL);
+            vec3 dy = dD < dU ? ViewPosAt(p + ivec2(0, 1), size, zD) - pC : pC - ViewPosAt(p - ivec2(0, 1), size, zU);
+            vec3 n = cross(dx, dy);
+            float nn = dot(n, n);
+            if (nn <= 1e-12) return vec3(0.0);
+            n *= inversesqrt(nn);
+            return dot(n, -pC) < 0.0 ? -n : n;
+        }
+        """;
+
+    const string SurfaceHelper = """
+        uniform usampler2D uSurface;  // Meitou's _giAlbedo (octahedral world-space shading normals when bit 8 of w is set)
+
+        vec3 OctDecode(vec2 p)
+        {
+            vec3 d = vec3(p.x, 1.0 - abs(p.x) - abs(p.y), p.y);
+            if (d.y < 0.0) d.xz = (1.0 - abs(d.zx)) * vec2(d.x >= 0.0 ? 1.0 : -1.0, d.z >= 0.0 ? 1.0 : -1.0);
+            return normalize(d);
+        }
+
+        bool SurfaceNormalAt(ivec2 p, ivec2 size, out vec3 n)
+        {
+            uvec4 s = texelFetch(uSurface, clamp(p, ivec2(0), size - 1), 0);
+            if ((s.w & 256u) == 0u) { n = vec3(0.0); return false; }
+            n = OctDecode(vec2(s.xy) / 65535.0 * 2.0 - 1.0);
+            return true;
+        }
+
+        float NormalEdge(ivec2 c, ivec2 size, int t, float zC, float zR, float zD)
+        {
+            ivec2 pR = c + ivec2(t, 0), pD = c + ivec2(0, t), pRD = c + ivec2(t, t);
+            vec3 n00, n10, n01, n11;
+            if (SurfaceNormalAt(c, size, n00) && SurfaceNormalAt(pR, size, n10)
+                && SurfaceNormalAt(pD, size, n01) && SurfaceNormalAt(pRD, size, n11))
+            {
+                float fold = NormalDiff(n00, n11) + NormalDiff(n10, n01);
+                return smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold);
+            }
+            float zRD = ViewZAt(pRD, size);
+            if (min(min(zR, zD), zRD) <= 0.0) return 0.0;
+            n00 = DepthNormalAt(c, size, zC);
+            n10 = DepthNormalAt(pR, size, zR);
+            n01 = DepthNormalAt(pD, size, zD);
+            n11 = DepthNormalAt(pRD, size, zRD);
+            float fold = NormalDiff(n00, n11) + NormalDiff(n10, n01);
+            return smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold);
+        }
+        """;
+
+    const string DepthOnlyHelper = """
+        float NormalEdge(ivec2 c, ivec2 size, int t, float zC, float zR, float zD)
+        {
+            ivec2 pR = c + ivec2(t, 0), pD = c + ivec2(0, t), pRD = c + ivec2(t, t);
+            float zRD = ViewZAt(pRD, size);
+            if (min(min(zR, zD), zRD) <= 0.0) return 0.0;
+            vec3 n00 = DepthNormalAt(c, size, zC);
+            vec3 n10 = DepthNormalAt(pR, size, zR);
+            vec3 n01 = DepthNormalAt(pD, size, zD);
+            vec3 n11 = DepthNormalAt(pRD, size, zRD);
+            float fold = NormalDiff(n00, n11) + NormalDiff(n10, n01);
+            return smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold);
+        }
+        """;
+
+    const string Tail = """
+        // Returns vec2(depthEdge, normalEdge), both smoothly faded toward maxDist.
+        vec2 Edges()
+        {
+            ivec2 size = textureSize(uDepth, 0);
+            ivec2 c = clamp(ivec2(floor(vUv * vec2(size))), ivec2(0), size - 1);
+            float maxDist = min(uMaxDepth * uRefFar, uPlanes.y * 0.99);
+            float zC = ViewZAt(c, size);
+            if (zC <= 0.0 || zC >= maxDist) return vec2(0.0);
+            int t = max(1, int(round(uThickness)));
+            float zL = ViewZAt(c - ivec2(t, 0), size), zR = ViewZAt(c + ivec2(t, 0), size);
+            float zU = ViewZAt(c - ivec2(0, t), size), zD = ViewZAt(c + ivec2(0, t), size);
             float wC = InvZ(zC);   // > 0: zC > 0 here
             float lap = abs(InvZ(zL) + InvZ(zR) + InvZ(zU) + InvZ(zD) - 4.0 * wC) / wC;
-            float e = smoothstep(uDepthThr, 1.5 * uDepthThr, lap);
-            if (uNormalThr > 0.0 && e < 1.0)
-            {
-                // the 2x2 block C, R, D, RD; each normal from its own right and down neighbours
-                float zRD = ViewZ(pic + px), zR2 = ViewZ(pic + vec2(2.0 * px.x, 0.0)), zD2 = ViewZ(pic + vec2(0.0, 2.0 * px.y));
-                float zR2D = ViewZ(pic + vec2(2.0 * px.x, px.y)), zRD2 = ViewZ(pic + vec2(px.x, 2.0 * px.y));
-                if (min(min(min(zR, zD), min(zRD, zR2)), min(min(zD2, zR2D), zRD2)) > 0.0)
-                {
-                    vec2 dx = vec2(px.x, 0.0), dy = vec2(0.0, px.y);
-                    vec3 pC = ViewPos(pic, zC), pR = ViewPos(pic + dx, zR), pD = ViewPos(pic + dy, zD), pRD = ViewPos(pic + px, zRD);
-                    vec3 nC = normalize(cross(pR - pC, pD - pC));
-                    vec3 nR = normalize(cross(ViewPos(pic + 2.0 * dx, zR2) - pR, pRD - pR));
-                    vec3 nD = normalize(cross(pRD - pD, ViewPos(pic + dy + dy, zD2) - pD));
-                    vec3 nRD = normalize(cross(ViewPos(pic + 2.0 * dx + dy, zR2D) - pRD, ViewPos(pic + dx + 2.0 * dy, zRD2) - pRD));
-                    float fold = max(1.0 - dot(nC, nRD), 1.0 - dot(nR, nD));
-                    e = max(e, smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold));
-                }
-            }
-            return e;
+            float depthE = smoothstep(uDepthThr, 1.5 * uDepthThr, lap);
+            float normalE = uNormalThr > 0.0 ? NormalEdge(c, size, t, zC, zR, zD) : 0.0;
+            float fade = 1.0 - smoothstep(maxDist * 0.65, maxDist, zC);
+            return vec2(depthE, normalE) * fade;
         }
 
         void main()
         {
-            vec2 pic = vec2(vUv.x, uFlipY != 0 ? 1.0 - vUv.y : vUv.y);
             vec3 c = textureLod(uImage, vUv, 0.0).rgb;
-            float e = Edge(pic);
-            if (uDebug != 0) { fragColour = vec4(vec3(1.0 - e), 1.0); return; }
+            vec2 edges = Edges();
+            if (uDebug != 0)
+            {
+                if (uSplit != 0 && vUv.x < 0.5) { fragColour = vec4(c, 1.0); return; }
+                fragColour = vec4(edges.x, edges.y, 0.0, 1.0);
+                return;
+            }
+            float e = max(edges.x, edges.y);
             if (!(uSplit != 0 && vUv.x < 0.5)) c = mix(c, uColour, e * clamp(uStrength, 0.0, 1.0));
             fragColour = vec4(c, 1.0);
         }
         """;
 }
 
-/// <summary>The shader's Edge in C#, for the offline check and the fuzz harness: depth z(i, j) on a pixel grid (0 = sky), the same taps and
-/// thresholds. (i, j) = the centre pixel; columns grow right, rows grow DOWN (top-down picture coordinates).</summary>
+/// <summary>The shader's Edges in C#, for the offline check and the fuzz harness: depth z(i, j) on a pixel grid (0 = sky), the same taps,
+/// silhouette-safe depth normals, Roberts Cross sum, and reference-distance fade. (i, j) = the centre pixel; columns grow right, rows grow DOWN.</summary>
 public static class OutlineMath
 {
     public static double Edge(Func<int, int, double> z, int i, int j, int w, int h, double tanHalf, double depthThr, double normalThr,
-        int thickness, double maxDepth, double far)
+        int thickness, double maxDepth, double far, double refFar = OutlineShader.ReferenceFar)
+    {
+        var (d, n) = Edges(z, i, j, w, h, tanHalf, depthThr, normalThr, thickness, maxDepth, far, refFar);
+        return Math.Max(d, n);
+    }
+
+    public static (double Depth, double Normal) Edges(Func<int, int, double> z, int i, int j, int w, int h, double tanHalf, double depthThr,
+        double normalThr, int thickness, double maxDepth, double far, double refFar = OutlineShader.ReferenceFar)
     {
         int t = Math.Clamp(thickness, 1, 4);
-        double Z(int di, int dj)
+        double Z(int x, int y)
         {
-            double v = z(Math.Clamp(i + di * t, 0, w - 1), Math.Clamp(j + dj * t, 0, h - 1));
+            double v = z(Math.Clamp(x, 0, w - 1), Math.Clamp(y, 0, h - 1));
             return double.IsFinite(v) && v > 0 ? Math.Max(v, 1e-3) : 0;   // as the shader's InvZ floor (fuzz 2026-11-19)
         }
         static double Inv(double v) => v > 0 ? 1 / v : 0;
         double aspect = w / (double)h;
-        System.Numerics.Vector3 P(int di, int dj, double zz)
+        System.Numerics.Vector3 P(int x, int y, double zz)
         {
-            double u = (i + di * t + 0.5) / w, v = (j + dj * t + 0.5) / h;
+            double u = (Math.Clamp(x, 0, w - 1) + 0.5) / w, v = (Math.Clamp(y, 0, h - 1) + 0.5) / h;
             return new((float)((u * 2 - 1) * aspect * tanHalf * zz), (float)((1 - v * 2) * tanHalf * zz), (float)zz);
         }
-        double zC = Z(0, 0);
-        if (zC <= 0 || zC > maxDepth * far) return 0;
-        double zL = Z(-1, 0), zR = Z(1, 0), zU = Z(0, -1), zD = Z(0, 1);
+        System.Numerics.Vector3 DepthNormal(int x, int y, double zz)
+        {
+            if (zz <= 0) return default;
+            double wc = Inv(zz);
+            double zl = Z(x - 1, y), zr = Z(x + 1, y), zu = Z(x, y - 1), zd = Z(x, y + 1);
+            double dl = zl > 0 ? Math.Abs(Inv(zl) - wc) : 1e30, dr = zr > 0 ? Math.Abs(Inv(zr) - wc) : 1e30;
+            double du = zu > 0 ? Math.Abs(Inv(zu) - wc) : 1e30, dd = zd > 0 ? Math.Abs(Inv(zd) - wc) : 1e30;
+            if (Math.Min(dl, dr) > 0.1 * wc || Math.Min(du, dd) > 0.1 * wc) return default;
+            var pc = P(x, y, zz);
+            var dx = dr < dl ? P(x + 1, y, zr) - pc : pc - P(x - 1, y, zl);
+            var dy = dd < du ? P(x, y + 1, zd) - pc : pc - P(x, y - 1, zu);
+            var n = System.Numerics.Vector3.Cross(dx, dy);
+            float nn = n.LengthSquared();
+            if (!float.IsFinite(nn) || nn <= 1e-12f) return default;
+            n /= MathF.Sqrt(nn);
+            return System.Numerics.Vector3.Dot(n, -pc) < 0 ? -n : n;
+        }
+        static double NormalDiff(System.Numerics.Vector3 a, System.Numerics.Vector3 b)
+        {
+            float aa = a.LengthSquared(), bb = b.LengthSquared();
+            if (!float.IsFinite(aa) || !float.IsFinite(bb) || aa <= 1e-4f || bb <= 1e-4f) return 0;
+            var d = a / MathF.Sqrt(aa) - b / MathF.Sqrt(bb);
+            double r = 0.5 * d.LengthSquared();
+            return double.IsFinite(r) ? r : 0;
+        }
+
+        double maxDist = Math.Min(maxDepth * refFar, far * 0.99);
+        double zC = Z(i, j);
+        if (zC <= 0 || zC >= maxDist) return (0, 0);
+        double zL = Z(i - t, j), zR = Z(i + t, j), zU = Z(i, j - t), zD = Z(i, j + t);
         double wC = Inv(zC);
         double lap = Math.Abs(Inv(zL) + Inv(zR) + Inv(zU) + Inv(zD) - 4 * wC) / wC;
-        double e = Smooth(depthThr, 1.5 * depthThr, lap);
-        if (normalThr > 0 && e < 1)
+        double depthE = Smooth(depthThr, 1.5 * depthThr, lap);
+        double normalE = 0;
+        if (normalThr > 0)
         {
-            double zRD = Z(1, 1), zR2 = Z(2, 0), zD2 = Z(0, 2), zR2D = Z(2, 1), zRD2 = Z(1, 2);
-            if (Math.Min(Math.Min(Math.Min(zR, zD), Math.Min(zRD, zR2)), Math.Min(Math.Min(zD2, zR2D), zRD2)) > 0)
+            double zRD = Z(i + t, j + t);
+            if (Math.Min(Math.Min(zR, zD), zRD) > 0)
             {
-                var pC = P(0, 0, zC); var pR = P(1, 0, zR); var pD = P(0, 1, zD); var pRD = P(1, 1, zRD);
-                var nC = N(pR - pC, pD - pC);
-                var nR = N(P(2, 0, zR2) - pR, pRD - pR);
-                var nD = N(pRD - pD, P(0, 2, zD2) - pD);
-                var nRD = N(P(2, 1, zR2D) - pRD, P(1, 2, zRD2) - pRD);
-                double fold = Math.Max(1 - System.Numerics.Vector3.Dot(nC, nRD), 1 - System.Numerics.Vector3.Dot(nR, nD));
-                if (double.IsFinite(fold)) e = Math.Max(e, Smooth(normalThr, 1.5 * normalThr + 1e-5, fold));
+                var n00 = DepthNormal(i, j, zC);
+                var n10 = DepthNormal(i + t, j, zR);
+                var n01 = DepthNormal(i, j + t, zD);
+                var n11 = DepthNormal(i + t, j + t, zRD);
+                double fold = NormalDiff(n00, n11) + NormalDiff(n10, n01);
+                if (double.IsFinite(fold)) normalE = Smooth(normalThr, 1.5 * normalThr + 1e-5, fold);
             }
         }
-        return e;
+        double fade = 1.0 - Smooth(maxDist * 0.65, maxDist, zC);
+        return (depthE * fade, normalE * fade);
     }
 
-    static System.Numerics.Vector3 N(System.Numerics.Vector3 a, System.Numerics.Vector3 b) => System.Numerics.Vector3.Normalize(System.Numerics.Vector3.Cross(a, b));
-
-    /// <summary>GLSL smoothstep.</summary>
+    /// <summary>GLSL smoothstep (supports reversed edges e0 &gt; e1 for fade-out).</summary>
     public static double Smooth(double e0, double e1, double x)
     {
+        if (e0 == e1) return x < e0 ? 0 : 1;
         double k = Math.Clamp((x - e0) / (e1 - e0), 0, 1);
         return k * k * (3 - 2 * k);
     }

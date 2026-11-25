@@ -112,7 +112,10 @@ static class PixelPass
             if (s_frameKw is { } kw)
                 steps.Add((KuwaharaPass.Program!, src => KuwaharaPass.Set(__instance, kw, src, size, Settings.Split), "pza kuwahara"));
             if (s_frameLine is { } line)
-                steps.Add((OutlinePass.Program!, src => OutlinePass.Set(__instance, line, src, Settings.Split, OutlineMask), "pza outline"));
+            {
+                var (prog, surf) = OutlinePass.Pick(__instance);
+                steps.Add((prog, src => OutlinePass.Set(__instance, prog, surf, line, src, Settings.Split, OutlineMask || line.Debug), "pza outline"));
+            }
             if (s_frameTilt is { } tilt)
                 steps.Add((TiltPass.Program!, src => TiltPass.Set(__instance, tilt, src, size, Settings.Split, TiltMask), "pza tilt-shift"));
             if (s_frameFish is { } fish)
@@ -409,48 +412,80 @@ public static class TiltPass
     }
 }
 
-/// <summary>0.4.0: PZA Outline (OutlineShader), lines from the scene depth, first in the chain.</summary>
+/// <summary>0.4.0 / 0.7.0: PZA Outline (OutlineShader), lines from scene depth + surface normals (when GI/SSR provides _giAlbedo, else
+/// silhouette-safe depth normals), first in the chain.</summary>
 static class OutlinePass
 {
-    public static LegacyProgram? Program;
-    static SamplerSlot s_image, s_depth;
-    static UniformHandle s_planes, s_depthThr, s_normalThr, s_thickness, s_strength, s_maxDepth, s_tan, s_aspect, s_colour, s_flipY, s_split, s_debug;
-    static bool s_logged;
+    sealed class Variant
+    {
+        public readonly LegacyProgram Program;
+        public readonly SamplerSlot Image, Depth, Surface;
+        public readonly UniformHandle Planes, DepthThr, NormalThr, Thickness, Strength, MaxDepth, RefFar, Tan, Aspect, Colour, FlipY, Split, Debug;
+
+        public Variant(PostProcess pp, bool surface)
+        {
+            var p = Program = LegacyProgram.Create(pp.Gpu, Access.Vertex!,
+                OutlineShader.Fragment(global::Meitou.Game.Rendering.Frame.DepthConvention.Glsl, surface),
+                surface ? "pza looks outline (surface)" : "pza looks outline");
+            (Image, Depth) = (p.Sampler("uImage"), p.Sampler("uDepth"));
+            Surface = surface ? p.Sampler("uSurface") : default;
+            (Planes, DepthThr, NormalThr, Thickness, Strength, MaxDepth, RefFar) = (p.Uniform("uPlanes"), p.Uniform("uDepthThr"),
+                p.Uniform("uNormalThr"), p.Uniform("uThickness"), p.Uniform("uStrength"), p.Uniform("uMaxDepth"), p.Uniform("uRefFar"));
+            (Tan, Aspect, Colour) = (p.Uniform("uTanHalfFov"), p.Uniform("uAspect"), p.Uniform("uColour"));
+            (FlipY, Split, Debug) = (p.Uniform("uFlipY"), p.Uniform("uSplit"), p.Uniform("uDebug"));
+        }
+    }
+
+    static Variant? s_depthOnly, s_surface;
+    static bool s_logged, s_loggedSurface;
 
     public static void Ensure(PostProcess pp)
     {
-        if (Program is not null) return;
-        var p = Program = LegacyProgram.Create(pp.Gpu, Access.Vertex!, OutlineShader.Fragment(global::Meitou.Game.Rendering.Frame.DepthConvention.Glsl),
-            "pza looks outline");
-        (s_image, s_depth) = (p.Sampler("uImage"), p.Sampler("uDepth"));
-        (s_planes, s_depthThr, s_normalThr, s_thickness, s_strength, s_maxDepth) = (p.Uniform("uPlanes"), p.Uniform("uDepthThr"),
-            p.Uniform("uNormalThr"), p.Uniform("uThickness"), p.Uniform("uStrength"), p.Uniform("uMaxDepth"));
-        (s_tan, s_aspect, s_colour) = (p.Uniform("uTanHalfFov"), p.Uniform("uAspect"), p.Uniform("uColour"));
-        (s_flipY, s_split, s_debug) = (p.Uniform("uFlipY"), p.Uniform("uSplit"), p.Uniform("uDebug"));
-        Log.Line("outline program compiled");
+        if (s_depthOnly is null)
+        {
+            s_depthOnly = new Variant(pp, surface: false);
+            Log.Line("outline program compiled (depth)");
+        }
+        if (s_surface is null && Access.SurfaceTarget(pp) is not null)
+        {
+            s_surface = new Variant(pp, surface: true);
+            Log.Line("outline program compiled (surface normals)");
+        }
     }
 
-    public static void Set(PostProcess pp, OutlineLook o, object source, bool split, bool mask)
+    public static (LegacyProgram Program, object? Surface) Pick(PostProcess pp)
     {
-        var p = Program!;
-        Access.Bind(pp, p, s_image, source);
-        Access.Bind(pp, p, s_depth, Access.DepthTarget(pp)!);
-        p.Set(s_planes, Access.Planes(pp));
-        p.Set(s_depthThr, o.Depth);
-        p.Set(s_normalThr, o.Normal);
-        p.Set(s_thickness, (float)o.Thickness);
-        p.Set(s_strength, o.Strength);
-        p.Set(s_maxDepth, o.MaxDepth);
-        p.Set(s_tan, FisheyePass.TanHalf(Access.FovY(pp)));
-        p.Set(s_aspect, Access.DisplaySize(pp) is var (w, h) && h > 0 ? w / (float)h : 16f / 9f);
-        p.Set(s_colour, new System.Numerics.Vector3(o.Red, o.Green, o.Blue));
-        p.Set(s_flipY, pp.Gpu.RenderTargetsBottomUp ? 1 : 0);
-        p.Set(s_split, split ? 1 : 0);
-        p.Set(s_debug, mask ? 1 : 0);
-        if (!s_logged)
+        var surf = Access.SurfaceTarget(pp);
+        if (surf is not null && s_surface is not null) return (s_surface.Program, surf);
+        return (s_depthOnly!.Program, null);
+    }
+
+    public static void Set(PostProcess pp, LegacyProgram prog, object? surface, OutlineLook o, object source, bool split, bool debug)
+    {
+        var v = ReferenceEquals(prog, s_surface?.Program) ? s_surface! : s_depthOnly!;
+        var p = v.Program;
+        Access.Bind(pp, p, v.Image, source);
+        Access.Bind(pp, p, v.Depth, Access.DepthTarget(pp)!);
+        if (surface is not null && ReferenceEquals(v, s_surface)) Access.Bind(pp, p, v.Surface, surface);
+        p.Set(v.Planes, Access.Planes(pp));
+        p.Set(v.DepthThr, o.Depth);
+        p.Set(v.NormalThr, o.Normal);
+        p.Set(v.Thickness, (float)o.Thickness);
+        p.Set(v.Strength, o.Strength);
+        p.Set(v.MaxDepth, o.MaxDepth);
+        p.Set(v.RefFar, OutlineShader.ReferenceFar);
+        p.Set(v.Tan, FisheyePass.TanHalf(Access.FovY(pp)));
+        p.Set(v.Aspect, Access.DisplaySize(pp) is var (w, h) && h > 0 ? w / (float)h : 16f / 9f);
+        p.Set(v.Colour, new System.Numerics.Vector3(o.Red, o.Green, o.Blue));
+        p.Set(v.FlipY, pp.Gpu.RenderTargetsBottomUp ? 1 : 0);
+        p.Set(v.Split, split ? 1 : 0);
+        p.Set(v.Debug, debug ? 1 : 0);
+        if (!s_logged || (surface is not null && !s_loggedSurface))
         {
             s_logged = true;
-            Log.Line($"outline: depth {o.Depth}, crease {o.Normal}, {o.Thickness} px, strength {o.Strength}, up to {o.MaxDepth:0.00} of the far plane, planes {Access.Planes(pp)}");
+            if (surface is not null) s_loggedSurface = true;
+            Log.Line($"outline: depth {o.Depth}, normal {o.Normal}, {o.Thickness} px, strength {o.Strength}, max {o.MaxDepth:0.00} x {OutlineShader.ReferenceFar:0} units, "
+                + $"normals {(surface is not null ? "surface (_giAlbedo)" : "depth fallback")}, planes {Access.Planes(pp)}");
         }
     }
 }
