@@ -2,7 +2,7 @@
   // PZA's Post-FX for Meitou (author PZA, GPLv3 or later): PZA's Dust looks (pixel art, PS1, Soft 240, Tilt-Shift) as passes on Meitou's finished picture.
   // Schema: MeitouClient docs/modding.md "Discovery", docs/modding-dependencies.md "Manifest".
   "id": "pza.looks",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "apiVersion": 2,
   "assemblies": ["PZALooks.Meitou.dll"],
   "entry": "PZA.Looks.Meitou.LooksMod",

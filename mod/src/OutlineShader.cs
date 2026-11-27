@@ -105,6 +105,8 @@ public static class OutlineShader
                 float fold = NormalDiff(n00, n11) + NormalDiff(n10, n01);
                 return smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold);
             }
+            float nearFallback = 1.0 - smoothstep(180.0, 500.0, zC);
+            if (nearFallback <= 0.0) return 0.0;
             float zRD = ViewZAt(pRD, size);
             if (min(min(zR, zD), zRD) <= 0.0) return 0.0;
             n00 = DepthNormalAt(c, size, zC);
@@ -112,7 +114,7 @@ public static class OutlineShader
             n01 = DepthNormalAt(pD, size, zD);
             n11 = DepthNormalAt(pRD, size, zRD);
             float fold = NormalDiff(n00, n11) + NormalDiff(n10, n01);
-            return smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold);
+            return smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold) * nearFallback;
         }
         """;
 
@@ -132,8 +134,8 @@ public static class OutlineShader
         """;
 
     const string Tail = """
-        // Returns vec2(depthEdge, normalEdge), both smoothly faded toward maxDist.
-        vec2 Edges()
+        // Returns vec2(depthEdge, normalEdge), stabilised against distant sub-pixel foliage jitter and veiled behind dust/haze.
+        vec2 Edges(vec3 imgC)
         {
             ivec2 size = textureSize(uDepth, 0);
             ivec2 c = clamp(ivec2(floor(vUv * vec2(size))), ivec2(0), size - 1);
@@ -144,17 +146,32 @@ public static class OutlineShader
             float zL = ViewZAt(c - ivec2(t, 0), size), zR = ViewZAt(c + ivec2(t, 0), size);
             float zU = ViewZAt(c - ivec2(0, t), size), zD = ViewZAt(c + ivec2(0, t), size);
             float wC = InvZ(zC);   // > 0: zC > 0 here
-            float lap = abs(InvZ(zL) + InvZ(zR) + InvZ(zU) + InvZ(zD) - 4.0 * wC) / wC;
-            float depthE = smoothstep(uDepthThr, 1.5 * uDepthThr, lap);
+            float wL = InvZ(zL), wR = InvZ(zR), wU = InvZ(zU), wD = InvZ(zD);
+            float lap = abs(wL + wR + wU + wD - 4.0 * wC) / wC;
+            float distFrac = clamp(zC / max(maxDist, 1.0), 0.0, 1.0);
+            float effDepthThr = uDepthThr * (1.0 + 3.0 * distFrac * distFrac);
+            float depthE = smoothstep(effDepthThr, 1.5 * effDepthThr, lap);
+            // Suppress isolated 1-pixel depth spikes at distance (alpha-tested foliage/grass cards flickering under TAA/FSR/DLSS jitter).
+            if (abs(wL - wC) > effDepthThr * wC && abs(wR - wC) > effDepthThr * wC
+                && abs(wU - wC) > effDepthThr * wC && abs(wD - wC) > effDepthThr * wC)
+                depthE *= 1.0 - smoothstep(180.0, 550.0, zC);
             float normalE = uNormalThr > 0.0 ? NormalEdge(c, size, t, zC, zR, zD) : 0.0;
-            float fade = 1.0 - smoothstep(maxDist * 0.65, maxDist, zC);
+            // Attenuate distant outlines where dust clouds / atmospheric haze wash out local image contrast (particles do not write depth).
+            vec2 stepUv = float(t) / vec2(size);
+            vec3 cL = textureLod(uImage, vUv - vec2(stepUv.x, 0.0), 0.0).rgb;
+            vec3 cR = textureLod(uImage, vUv + vec2(stepUv.x, 0.0), 0.0).rgb;
+            vec3 cU = textureLod(uImage, vUv - vec2(0.0, stepUv.y), 0.0).rgb;
+            vec3 cD = textureLod(uImage, vUv + vec2(0.0, stepUv.y), 0.0).rgb;
+            float imgContrast = max(max(length(imgC - cL), length(imgC - cR)), max(length(imgC - cU), length(imgC - cD)));
+            float hazeVis = mix(1.0, smoothstep(0.02, 0.12, imgContrast), smoothstep(180.0, 650.0, zC));
+            float fade = (1.0 - smoothstep(maxDist * 0.55, maxDist, zC)) * hazeVis;
             return vec2(depthE, normalE) * fade;
         }
 
         void main()
         {
             vec3 c = textureLod(uImage, vUv, 0.0).rgb;
-            vec2 edges = Edges();
+            vec2 edges = Edges(c);
             if (uDebug != 0)
             {
                 if (uSplit != 0 && vUv.x < 0.5) { fragColour = vec4(c, 1.0); return; }
@@ -226,8 +243,14 @@ public static class OutlineMath
         if (zC <= 0 || zC >= maxDist) return (0, 0);
         double zL = Z(i - t, j), zR = Z(i + t, j), zU = Z(i, j - t), zD = Z(i, j + t);
         double wC = Inv(zC);
-        double lap = Math.Abs(Inv(zL) + Inv(zR) + Inv(zU) + Inv(zD) - 4 * wC) / wC;
-        double depthE = Smooth(depthThr, 1.5 * depthThr, lap);
+        double wL = Inv(zL), wR = Inv(zR), wU = Inv(zU), wD = Inv(zD);
+        double lap = Math.Abs(wL + wR + wU + wD - 4 * wC) / wC;
+        double distFrac = Math.Clamp(zC / Math.Max(maxDist, 1.0), 0, 1);
+        double effDepthThr = depthThr * (1.0 + 3.0 * distFrac * distFrac);
+        double depthE = Smooth(effDepthThr, 1.5 * effDepthThr, lap);
+        if (Math.Abs(wL - wC) > effDepthThr * wC && Math.Abs(wR - wC) > effDepthThr * wC
+            && Math.Abs(wU - wC) > effDepthThr * wC && Math.Abs(wD - wC) > effDepthThr * wC)
+            depthE *= 1.0 - Smooth(180.0, 550.0, zC);
         double normalE = 0;
         if (normalThr > 0)
         {
@@ -242,7 +265,7 @@ public static class OutlineMath
                 if (double.IsFinite(fold)) normalE = Smooth(normalThr, 1.5 * normalThr + 1e-5, fold);
             }
         }
-        double fade = 1.0 - Smooth(maxDist * 0.65, maxDist, zC);
+        double fade = 1.0 - Smooth(maxDist * 0.55, maxDist, zC);
         return (depthE * fade, normalE * fade);
     }
 
