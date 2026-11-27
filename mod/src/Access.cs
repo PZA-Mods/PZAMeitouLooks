@@ -66,7 +66,7 @@ static class Access
         Need(missing, s_fovY?.PropertyType == typeof(float), "PostProcess.FovY");
         Need(missing, s_planes?.PropertyType == typeof(System.Numerics.Vector2), "PostProcess.Planes");
         Need(missing, RunCompositeChain is not null && Final(RunCompositeChain), "PostProcess.RunCompositeChain(.., PassTargets final, ..)");
-        Need(missing, s_make is not null && s_make.GetParameters().Length == 7, "PostProcess.Make");
+        Need(missing, s_make is not null && MakeOk(s_make), "PostProcess.Make");
         Need(missing, s_bind, "PostProcess.Bind(LegacyProgram, SamplerSlot, Target2D)");
         Need(missing, s_drawFinal, "PostProcess.DrawFinal");
         Need(missing, s_stamp, "PostProcess.Stamp");
@@ -74,6 +74,15 @@ static class Access
         Need(missing, s_targetTexture, "PostProcess.Target2D.Texture");
         Need(missing, Vertex, "PostProcessShaders.Vertex");
         return missing;
+    }
+
+    static bool MakeOk(MethodInfo m)
+    {
+        var ps = m.GetParameters();
+        if (ps.Length < 7) return false;
+        for (int i = 7; i < ps.Length; i++)
+            if (!ps[i].HasDefaultValue) return false;
+        return true;
     }
 
     static bool Final(MethodInfo m) => m.GetParameters().Any(p => p.Name == "final" && p.ParameterType == typeof(PassTargets));
@@ -89,7 +98,17 @@ static class Access
     public static object MakeTarget(PostProcess pp, int width, int height, string name)
     {
         using var batch = pp.Gpu.Uploads.Begin();
-        return s_make!.Invoke(pp, [batch, width, height, InternalFormat.Rgba8, TextureMinFilter.Linear, name, 1])!;
+        var ps = s_make!.GetParameters();
+        var args = new object?[ps.Length];
+        args[0] = batch;
+        args[1] = width;
+        args[2] = height;
+        args[3] = InternalFormat.Rgba8;
+        args[4] = TextureMinFilter.Linear;
+        args[5] = name;
+        args[6] = 1;
+        for (int i = 7; i < ps.Length; i++) args[i] = ps[i].DefaultValue;
+        return s_make.Invoke(pp, args)!;
     }
 
     public static GpuTexture TextureOf(object target2D) => (GpuTexture)s_targetTexture!.GetValue(target2D)!;

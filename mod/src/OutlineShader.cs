@@ -97,13 +97,17 @@ public static class OutlineShader
 
         float NormalEdge(ivec2 c, ivec2 size, int t, float zC, float zR, float zD)
         {
+            // Fade crease/normal lines out with distance so close-up characters and buildings keep crisp internal creases
+            // without turning distant cliffs, rocks and foliage into noisy flicker (silhouettes remain via depthE).
+            float creaseFade = 1.0 - smoothstep(180.0, 800.0, zC);
+            if (creaseFade <= 0.0) return 0.0;
             ivec2 pR = c + ivec2(t, 0), pD = c + ivec2(0, t), pRD = c + ivec2(t, t);
             vec3 n00, n10, n01, n11;
             if (SurfaceNormalAt(c, size, n00) && SurfaceNormalAt(pR, size, n10)
                 && SurfaceNormalAt(pD, size, n01) && SurfaceNormalAt(pRD, size, n11))
             {
                 float fold = NormalDiff(n00, n11) + NormalDiff(n10, n01);
-                return smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold);
+                return smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold) * creaseFade;
             }
             float nearFallback = 1.0 - smoothstep(180.0, 500.0, zC);
             if (nearFallback <= 0.0) return 0.0;
@@ -121,6 +125,8 @@ public static class OutlineShader
     const string DepthOnlyHelper = """
         float NormalEdge(ivec2 c, ivec2 size, int t, float zC, float zR, float zD)
         {
+            float creaseFade = 1.0 - smoothstep(180.0, 650.0, zC);
+            if (creaseFade <= 0.0) return 0.0;
             ivec2 pR = c + ivec2(t, 0), pD = c + ivec2(0, t), pRD = c + ivec2(t, t);
             float zRD = ViewZAt(pRD, size);
             if (min(min(zR, zD), zRD) <= 0.0) return 0.0;
@@ -129,7 +135,7 @@ public static class OutlineShader
             vec3 n01 = DepthNormalAt(pD, size, zD);
             vec3 n11 = DepthNormalAt(pRD, size, zRD);
             float fold = NormalDiff(n00, n11) + NormalDiff(n10, n01);
-            return smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold);
+            return smoothstep(uNormalThr, 1.5 * uNormalThr + 1e-5, fold) * creaseFade;
         }
         """;
 
@@ -252,7 +258,8 @@ public static class OutlineMath
             && Math.Abs(wU - wC) > effDepthThr * wC && Math.Abs(wD - wC) > effDepthThr * wC)
             depthE *= 1.0 - Smooth(180.0, 550.0, zC);
         double normalE = 0;
-        if (normalThr > 0)
+        double creaseFade = 1.0 - Smooth(180.0, 650.0, zC);
+        if (normalThr > 0 && creaseFade > 0)
         {
             double zRD = Z(i + t, j + t);
             if (Math.Min(Math.Min(zR, zD), zRD) > 0)
@@ -262,7 +269,7 @@ public static class OutlineMath
                 var n01 = DepthNormal(i, j + t, zD);
                 var n11 = DepthNormal(i + t, j + t, zRD);
                 double fold = NormalDiff(n00, n11) + NormalDiff(n10, n01);
-                if (double.IsFinite(fold)) normalE = Smooth(normalThr, 1.5 * normalThr + 1e-5, fold);
+                if (double.IsFinite(fold)) normalE = Smooth(normalThr, 1.5 * normalThr + 1e-5, fold) * creaseFade;
             }
         }
         double fade = 1.0 - Smooth(maxDist * 0.55, maxDist, zC);
