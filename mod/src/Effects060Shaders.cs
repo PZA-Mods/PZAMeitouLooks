@@ -193,9 +193,49 @@ public static class ScreenShader
         """;
 }
 
+public static class LetterboxShader
+{
+    public const string Fragment = """
+        #version 330 core
+        in vec2 vUv;
+        out vec4 fragColour;
+        uniform sampler2D uImage;
+        uniform vec2 uViewport;
+        uniform float uAspect, uSoftness, uStrength;
+        uniform int uFlipY, uSplit;
+
+        void main()
+        {
+            vec3 orig = textureLod(uImage, vUv, 0.0).rgb;
+            float py = uFlipY != 0 ? 1.0 - vUv.y : vUv.y;
+            float viewAspect = uViewport.x / max(uViewport.y, 1.0);
+            float target = max(uAspect, 0.1);
+            float bar = max(0.0, 0.5 * (1.0 - viewAspect / target));
+            float edge = min(py, 1.0 - py);
+            float soft = max(uSoftness, 0.0);
+            float keep = soft <= 1e-5 ? step(bar, edge) : smoothstep(bar, bar + soft, edge);
+            vec3 c = mix(orig, orig * keep, clamp(uStrength, 0.0, 1.0));
+            if (uSplit != 0 && vUv.x < 0.5) c = orig;
+            fragColour = vec4(c, 1.0);
+        }
+        """;
+}
+
 /// <summary>The new passes' maths in C# (the offline check and the fuzzer).</summary>
 public static class Effects060Math
 {
+    /// <summary>LetterboxShader's keep factor (0 inside the black bar, 1 in the picture).</summary>
+    public static double LetterboxKeep(double py, double viewAspect, double targetAspect, double softness)
+    {
+        double va = double.IsFinite(viewAspect) && viewAspect > 0.01 ? viewAspect : 16.0 / 9.0;
+        double ta = double.IsFinite(targetAspect) && targetAspect > 0.1 ? targetAspect : 2.39;
+        double bar = Math.Max(0.0, 0.5 * (1.0 - va / ta));
+        double edge = Math.Min(Math.Clamp(double.IsFinite(py) ? py : 0.5, 0.0, 1.0), 1.0 - Math.Clamp(double.IsFinite(py) ? py : 0.5, 0.0, 1.0));
+        double soft = double.IsFinite(softness) && softness > 0 ? softness : 0.0;
+        if (soft <= 1e-5) return edge >= bar ? 1.0 : 0.0;
+        double t = Math.Clamp((edge - bar) / soft, 0.0, 1.0);
+        return t * t * (3.0 - 2.0 * t);
+    }
     /// <summary>NoirShader's Grey: the black-and-white level of a brightness l.</summary>
     public static double NoirGrey(double l, double contrast, double crush)
     {

@@ -11,7 +11,8 @@ namespace PZA.Looks.Meitou;
 public static class LooksApi
 {
     /// <summary>Bumped when a member changes meaning; a caller checks it is at least the version it was written for.</summary>
-    public const int Version = 5;   // 5 (0.6.0): + Noir / Halftone / Screen / Combo names, getters and setters
+    public const int Version = 6;   // 6 (0.6.3): + Letterbox names, getter and setter
+    // was 5   // 5 (0.6.0): + Noir / Halftone / Screen / Combo names, getters and setters
     // was 4   // 4 (0.5.0): + Kuwahara / N64 / Toon names, getters and setters (Toon applies at the next start)
     // 2 (0.3.0): + FisheyeNames / Fisheye / SetFisheye; 3 (0.4.0): + OutlineNames / Outline / SetOutline,
                                     // every list ends with "Custom" (the player's own slider values), and a preset set here fills its sliders
@@ -86,6 +87,11 @@ public static class LooksApi
     public static string[] ScreenNames => [.. Screens.Names];
     public static string Screen => PixelPass.Settings.Screen;
     public static bool SetScreen(string name) => Set(nameof(LooksSettings.Screen), name, Screens.Names);
+
+    /// <summary>Version 6: Off, every Letterbox's name (2.39:1, 2.00:1, 1.85:1, Soft) and Custom.</summary>
+    public static string[] LetterboxNames => [.. Letterboxes.Names];
+    public static string Letterbox => PixelPass.Settings.Letterbox;
+    public static bool SetLetterbox(string name) => Set(nameof(LooksSettings.Letterbox), name, Letterboxes.Names);
 
     /// <summary>Version 5: Off, every Combo's name and Custom. A combo sets every effect list (Off turns them all off); a combo with a Toon
     /// draws its Toon from the next start.</summary>

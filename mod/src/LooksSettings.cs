@@ -378,10 +378,30 @@ public sealed class LooksSettings
     [Setting(Strings.En.Strength, Hint = Strings.En.ScStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
     public float ScStrength { get; set; } = 1f;
 
-    // ---- Compare ---------------------------------------------------------------------------------------------------------------------------
+    // ---- Letterbox (0.6.3) ----
+    [Setting(Strings.En.LetterboxLabel, Hint = Strings.En.LetterboxHint, Options = ["Off", "PZA Letterbox - 2.39:1 Cinema",
+        "PZA Letterbox - 2.00:1 Univisium", "PZA Letterbox - 1.85:1 Widescreen", "PZA Letterbox - Soft", "Custom"])]
+    public string Letterbox { get; set; } = "Off";
+
+    public bool LetterboxOn => Letterbox != Looks.Off;
+
+    [Setting(Strings.En.LbAspect, Hint = Strings.En.LbAspectHint, Min = 1.33, Max = 3.0, Step = 0.01, SubGroup = Strings.En.LbGroup, VisibleWhen = nameof(LetterboxOn))]
+    public float LbAspect { get; set; } = 2.39f;
+
+    [Setting(Strings.En.LbSoftness, Hint = Strings.En.LbSoftnessHint, Min = 0, Max = 0.15, Step = 0.005, SubGroup = Strings.En.LbGroup, VisibleWhen = nameof(LetterboxOn))]
+    public float LbSoftness { get; set; } = 0f;
+
+    [Setting(Strings.En.Strength, Hint = Strings.En.LbStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.LbGroup, VisibleWhen = nameof(LetterboxOn))]
+    public float LbStrength { get; set; } = 1f;
+
+    // ---- Compare & Presets -----------------------------------------------------------------------------------------------------------------
     /// <summary>Compare: the left half of the screen as Meitou draws it, the right half with the look.</summary>
     [Setting(Strings.En.SplitLabel, Hint = Strings.En.SplitHint)]
     public bool Split { get; set; }
+
+    /// <summary>0.7.0: opens the named Preset Manager window (snaps back off immediately).</summary>
+    [Setting(Strings.En.PresetsLabel, Hint = Strings.En.PresetsHint)]
+    public bool OpenPresets { get; set; }
 }
 
 static class Strings
@@ -516,6 +536,8 @@ static class Strings
         public const string ScStrengthHint = "Mixes the screen effect with Meitou's picture (1 = full).";
         public const string SplitLabel = "Compare (left half without)";
         public const string SplitHint = "Shows the left half of the screen without the looks, for a before / after.";
+        public const string PresetsLabel = "Presets manager";
+        public const string PresetsHint = "Opens the named Preset Manager window: save, load and delete custom Post-FX presets, or copy/import PZAFX1:... share codes.";
 
         public const string Strength = "Strength";
 
@@ -594,5 +616,14 @@ static class Strings
         public const string OlMaxDepthHint = "How far away lines are drawn (0.5 = 2,500 units, 1 = 5,000 units), fading smoothly before the cutoff so distant mountains stay clean.";
         public const string OlDebug = "Debug view";
         public const string OlDebugHint = "Shows raw edge detection instead of the scene: red = depth edges, green = normal/crease edges (matching Dust's Debug View).";
+
+        public const string LetterboxLabel = "Letterbox";
+        public const string LetterboxHint = "Cinema black bars on the top and bottom of the picture (drawn last over every other look; menus and text stay on top).";
+        public const string LbGroup = "Letterbox";
+        public const string LbAspect = "Aspect ratio";
+        public const string LbAspectHint = "Target frame ratio (2.39 = anamorphic cinema, 2.00 = Univisium, 1.85 = widescreen). Wider ratios add taller bars.";
+        public const string LbSoftness = "Edge softness";
+        public const string LbSoftnessHint = "Feathers the inner edge of the bars (0 = crisp cinema bars).";
+        public const string LbStrengthHint = "Bar opacity (1 = solid black).";
     }
 }

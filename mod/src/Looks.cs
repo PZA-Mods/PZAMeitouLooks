@@ -315,6 +315,29 @@ public static class Noirs
     public static NoirLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
 }
 
+/// <summary>0.6.3: one Letterbox (LetterboxShader): cinema black bars on top and bottom (Meitou's own letterbox is in a debug menu,
+/// so PZA's Post-FX puts it right on Settings > Mods). Drawn last, after Screen, so bars stay crisp.</summary>
+public sealed record LetterboxLook(
+    string Name,
+    float Aspect,        // target aspect ratio (e.g. 2.39 for anamorphic cinema, 2.00 Univisium, 1.85 widescreen)
+    float Softness,      // edge feathering in screen heights (0 = crisp cinema bars)
+    float Strength);     // opacity of the bars (0..1)
+
+public static class Letterboxes
+{
+    public static readonly LetterboxLook[] All =
+    [
+        new("PZA Letterbox - 2.39:1 Cinema", 2.39f, 0f, 1f),
+        new("PZA Letterbox - 2.00:1 Univisium", 2.00f, 0f, 1f),
+        new("PZA Letterbox - 1.85:1 Widescreen", 1.85f, 0f, 1f),
+        new("PZA Letterbox - Soft", 2.39f, 0.03f, 0.95f),
+    ];
+
+    public static readonly string[] Names = [Looks.Off, .. All.Select(l => l.Name), Looks.Custom];
+
+    public static LetterboxLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
+}
+
 /// <summary>0.6.0: a Combo, one pick for several effects (the user's Dust Combo presets and new ones). Each entry: list key -> preset name;
 /// a list not named is set Off.</summary>
 public sealed record ComboLook(string Name, (string List, string Preset)[] Sets);

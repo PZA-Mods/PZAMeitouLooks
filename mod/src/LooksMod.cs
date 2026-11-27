@@ -31,6 +31,10 @@ public sealed class LooksMod : IMod
         if (plus >= 0) version = version[..plus];
         Log.Line($"{version} for Meitou, by PZA: look '{PixelPass.Settings.Look}', Tilt-Shift '{PixelPass.Settings.TiltShift}', Fisheye '{PixelPass.Settings.Fisheye}', Outline '{PixelPass.Settings.Outline}', Kuwahara '{PixelPass.Settings.Kuwahara}', N64 '{PixelPass.Settings.N64}', "
             + $"Toon '{PixelPass.Settings.Toon}' (Settings > Mods)");
+        // 0.7.0: named preset manager window (PZA's Meitou UI), opened from Settings > Mods or F10 > Mods
+        PresetsWindow.Setup(context.Folder);
+        PZA.MeitouUi.PzaUi.Install(context);
+        context.AddDebugCommand("PZA's Post-FX: Presets", _ => { PresetsWindow.Open(); return "opened PZA's Post-FX Presets window"; });
         // 0.5.0: Toon lives in Meitou's lighting shaders, which compile once: frozen now for this game (a change applies at the next start)
         try { Log.Line(ToonPatch.Apply(context.Harmony, LookValues.Toon(PixelPass.Settings))); }
         catch (Exception e) { Log.Line("toon: stays OFF: patching failed (" + e.GetType().Name + ": " + e.Message + ")"); }

@@ -31,13 +31,14 @@ public static class LookValues
         "Sc" => nameof(LooksSettings.Screen),   // 0.6.0
         "Ht" => nameof(LooksSettings.Halftone),
         "Nr" => nameof(LooksSettings.Noir),
+        "Lb" => nameof(LooksSettings.Letterbox),   // 0.6.3
         _ => null,
     };
 
     /// <summary>Every effect's preset list, in the Settings page's order.</summary>
     public static readonly string[] Lists = [nameof(LooksSettings.Look), nameof(LooksSettings.TiltShift), nameof(LooksSettings.Fisheye),
         nameof(LooksSettings.Outline), nameof(LooksSettings.Kuwahara), nameof(LooksSettings.N64), nameof(LooksSettings.Toon),
-        nameof(LooksSettings.Noir), nameof(LooksSettings.Halftone), nameof(LooksSettings.Screen)];   // 0.6.0: the Combo list is not one of these
+        nameof(LooksSettings.Noir), nameof(LooksSettings.Halftone), nameof(LooksSettings.Screen), nameof(LooksSettings.Letterbox)];   // 0.6.0: the Combo list is not one of these
 
     [ThreadStatic] static bool t_applying;
 
@@ -59,6 +60,15 @@ public static class LookValues
     public static void OnChanged(ModSettingsGroup? group, LooksSettings s, string key)
     {
         if (t_applying) return;
+        if (key == nameof(LooksSettings.OpenPresets))
+        {
+            if (s.OpenPresets)
+            {
+                PresetsWindow.Open();
+                Run(() => Set(group, s, nameof(LooksSettings.OpenPresets), false));
+            }
+            return;
+        }
         if (key == nameof(LooksSettings.Combo)) { ApplyCombo(group, s); return; }
         if (ListOf(key) is { } list)
         {
@@ -248,6 +258,14 @@ public static class LookValues
                     Set(group, s, nameof(s.ScStrength), c.Strength);
                 });
                 break;
+            case nameof(LooksSettings.Letterbox) when Letterboxes.Find(s.Letterbox) is { } lb:
+                Run(() =>
+                {
+                    Set(group, s, nameof(s.LbAspect), lb.Aspect);
+                    Set(group, s, nameof(s.LbSoftness), lb.Softness);
+                    Set(group, s, nameof(s.LbStrength), lb.Strength);
+                });
+                break;
         }
     }
 
@@ -256,6 +274,8 @@ public static class LookValues
         int i = Array.IndexOf(NativeLines, (int)MathF.Round(lines));
         return Natives[i < 0 ? 0 : i];
     }
+
+    internal static void RunSuppressed(Action a) => Run(a);
 
     static void Run(Action a)
     {
@@ -389,4 +409,11 @@ public static class LookValues
         F(s.ScBleed, 0, 1, 0),
         F(s.ScSoften, 0, 1, 0.15f),
         F(s.ScStrength, 0, 1, 1));
+
+    // 0.6.3
+    public static LetterboxLook? Letterbox(LooksSettings s) => s.Letterbox == Looks.Off || !Letterboxes.Names.Contains(s.Letterbox) ? null : new(
+        s.Letterbox,
+        F(s.LbAspect, 1.33f, 3.0f, 2.39f),
+        F(s.LbSoftness, 0, 0.15f, 0),
+        F(s.LbStrength, 0, 1, 1));
 }

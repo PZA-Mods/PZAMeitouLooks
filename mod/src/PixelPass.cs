@@ -32,6 +32,7 @@ static class PixelPass
     static NoirLook? s_frameNoir;          // 0.6.0
     static HalftoneLook? s_frameHt;
     static ScreenLook? s_frameScreen;
+    static LetterboxLook? s_frameLb;       // 0.6.3
     static bool s_failed, s_hdrLogged;
     static string? s_lastChoice;
     public static int FramesDrawn { get; private set; }
@@ -53,6 +54,7 @@ static class PixelPass
         (s_frameLook, s_frameTilt, s_frameFish, s_frameLine) = (null, null, null, null);
         (s_frameKw, s_frameN64) = (null, null);
         (s_frameNoir, s_frameHt, s_frameScreen) = (null, null, null);
+        s_frameLb = null;
         if (s_failed) return;
         // 0.4.0: the sliders' values (a preset filled them; Custom = the player's own)
         var look = LookValues.Pixel(Settings);
@@ -64,8 +66,10 @@ static class PixelPass
         var noir = LookValues.Noir(Settings);   // 0.6.0
         var ht = LookValues.Halftone(Settings);
         var screen = LookValues.Screen(Settings);
-        LogChoice(look, tilt, fish, line, kw, n64, noir, ht, screen);
-        if (look is null && tilt is null && fish is null && line is null && kw is null && n64 is null && noir is null && ht is null && screen is null)
+        var lb = LookValues.Letterbox(Settings);   // 0.6.3
+        LogChoice(look, tilt, fish, line, kw, n64, noir, ht, screen, lb);
+        if (look is null && tilt is null && fish is null && line is null && kw is null && n64 is null && noir is null && ht is null
+            && screen is null && lb is null)
             return;
         try
         {
@@ -79,14 +83,16 @@ static class PixelPass
             if (w <= 0 || h <= 0) return;
             if (!TiltPass.Ready(__instance)) (tilt, line, n64) = (null, null, null);   // no depth yet (first frames): the others alone
             if (look is null && tilt is null && fish is null && line is null && kw is null && n64 is null && noir is null && ht is null
-                && screen is null) return;
+                && screen is null && lb is null) return;
             int passes = (look is null ? 0 : 1) + (tilt is null ? 0 : 1) + (fish is null ? 0 : 1) + (line is null ? 0 : 1)
-                + (kw is null ? 0 : 1) + (n64 is null ? 0 : 1) + (noir is null ? 0 : 1) + (ht is null ? 0 : 1) + (screen is null ? 0 : 1);
+                + (kw is null ? 0 : 1) + (n64 is null ? 0 : 1) + (noir is null ? 0 : 1) + (ht is null ? 0 : 1)
+                + (screen is null ? 0 : 1) + (lb is null ? 0 : 1);
             Ensure(__instance, w, h, passes >= 2);
             __state = final;
             (s_frameLook, s_frameTilt, s_frameFish, s_frameLine) = (look, tilt, fish, line);
             (s_frameKw, s_frameN64) = (kw, n64);
             (s_frameNoir, s_frameHt, s_frameScreen) = (noir, ht, screen);
+            s_frameLb = lb;
             final = PassTargets.Of(Access.TextureOf(s_a!), null);
         }
         catch (Exception e)
@@ -128,6 +134,8 @@ static class PixelPass
                 steps.Add((LookPass.Program!, src => LookPass.Set(__instance, look, src, size, Settings.Split), "pza looks"));
             if (s_frameScreen is { } screen)
                 steps.Add((ScreenPass.Program!, src => ScreenPass.Set(__instance, screen, src, size, Settings.Split), "pza screen"));
+            if (s_frameLb is { } lb)
+                steps.Add((LetterboxPass.Program!, src => LetterboxPass.Set(__instance, lb, src, size, Settings.Split), "pza letterbox"));
             object source = s_a!;
             for (int i = 0; i < steps.Count; i++)
             {
@@ -165,6 +173,7 @@ static class PixelPass
         NoirPass.Ensure(pp);
         HalftonePass.Ensure(pp);
         ScreenPass.Ensure(pp);
+        LetterboxPass.Ensure(pp);
         if (s_a is not null && (s_width != w || s_height != h))
         {
             Access.TextureOf(s_a).Dispose();
@@ -177,12 +186,13 @@ static class PixelPass
     }
 
     static void LogChoice(PixelLook? look, TiltLook? tilt, FisheyeLook? fish, OutlineLook? line, KuwaharaLook? kw, N64Look? n64, NoirLook? noir,
-        HalftoneLook? ht, ScreenLook? screen)
+        HalftoneLook? ht, ScreenLook? screen, LetterboxLook? lb)
     {
         // the names only (a slider dragged on the Settings page would log every step otherwise)
         string choice = $"look '{look?.Name ?? Looks.Off}', Tilt-Shift '{tilt?.Name ?? Looks.Off}', Fisheye '{fish?.Name ?? Looks.Off}', "
             + $"Outline '{line?.Name ?? Looks.Off}', Kuwahara '{kw?.Name ?? Looks.Off}', N64 '{n64?.Name ?? Looks.Off}', "
-            + $"Noir '{noir?.Name ?? Looks.Off}', Halftone '{ht?.Name ?? Looks.Off}', Screen '{screen?.Name ?? Looks.Off}'";
+            + $"Noir '{noir?.Name ?? Looks.Off}', Halftone '{ht?.Name ?? Looks.Off}', Screen '{screen?.Name ?? Looks.Off}', "
+            + $"Letterbox '{lb?.Name ?? Looks.Off}'";
         if (choice == s_lastChoice) return;
         s_lastChoice = choice;
         Log.Line(choice);
@@ -680,6 +690,36 @@ public static class ScreenPass
         p.Set(s_bleed, c.Bleed);
         p.Set(s_soften, c.Soften);
         p.Set(s_strength, c.Strength);
+        p.Set(s_flipY, pp.Gpu.RenderTargetsBottomUp ? 1 : 0);
+        p.Set(s_split, split ? 1 : 0);
+    }
+}
+
+/// <summary>0.6.3: PZA Letterbox (LetterboxShader), drawn very last over every other look.</summary>
+public static class LetterboxPass
+{
+    public static LegacyProgram? Program;
+    static SamplerSlot s_image;
+    static UniformHandle s_viewport, s_aspect, s_softness, s_strength, s_flipY, s_split;
+
+    public static void Ensure(PostProcess pp)
+    {
+        if (Program is not null) return;
+        var p = Program = LegacyProgram.Create(pp.Gpu, Access.Vertex!, LetterboxShader.Fragment, "pza looks letterbox");
+        s_image = p.Sampler("uImage");
+        (s_viewport, s_aspect, s_softness, s_strength, s_flipY, s_split) = (p.Uniform("uViewport"), p.Uniform("uAspect"),
+            p.Uniform("uSoftness"), p.Uniform("uStrength"), p.Uniform("uFlipY"), p.Uniform("uSplit"));
+        Log.Line("letterbox program compiled");
+    }
+
+    public static void Set(PostProcess pp, LetterboxLook lb, object source, (int W, int H) size, bool split)
+    {
+        var p = Program!;
+        Access.Bind(pp, p, s_image, source);
+        p.Set(s_viewport, size.W, (float)size.H);
+        p.Set(s_aspect, lb.Aspect);
+        p.Set(s_softness, lb.Softness);
+        p.Set(s_strength, lb.Strength);
         p.Set(s_flipY, pp.Gpu.RenderTargetsBottomUp ? 1 : 0);
         p.Set(s_split, split ? 1 : 0);
     }
