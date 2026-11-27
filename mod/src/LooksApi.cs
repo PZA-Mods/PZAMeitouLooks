@@ -107,7 +107,8 @@ public static class LooksApi
         else
         {   // no group (the offline check): the preset's sliders as the group's Changed would fill them
             typeof(LooksSettings).GetProperty(key)!.SetValue(PixelPass.Settings, name);
-            LookValues.OnChanged(null, PixelPass.Settings, key);   // 0.6.0: as the group's Changed (a combo, or a list changed under one)
+            LookValues.OnChanged(null, PixelPass.Settings, key);
+            MeitouLetterbox.Sync(PixelPass.Settings);   // 0.7.3 (with a group, its Changed does this)   // 0.6.0: as the group's Changed (a combo, or a list changed under one)
         }
         return true;
     }

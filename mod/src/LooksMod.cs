@@ -23,9 +23,18 @@ public sealed class LooksMod : IMod
             var kept = PZA.MeitouUi.PzaSettings.Keep(LooksApi.Group, context.Folder);
             foreach (var line in kept) Log.Line(line);
         }
+        // 0.7.4: a pixel look whose program never drew its first frame at the last start (a frozen driver) starts Off
+        SafeStart.Folder(context.Folder);
+        SafeStart.Check(PixelPass.Settings, LooksApi.Group);
         // 0.4.0: a preset fills its sliders, a slider makes its list Custom; named presets put their values back now
         LookValues.Hook(LooksApi.Group, PixelPass.Settings);
         TestOverrides();
+        // 0.7.3: Meitou 0.24.1+ has its own Letterbox: PZA Letterbox drives it instead of drawing a second set of bars (MeitouLetterbox.cs)
+        if (MeitouLetterbox.Bind(context))
+        {
+            MeitouLetterbox.Sync(PixelPass.Settings);
+            if (LooksApi.Group is { } lbGroup) lbGroup.Changed += _ => MeitouLetterbox.Sync(PixelPass.Settings);
+        }
         string version = typeof(LooksMod).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "?";
         int plus = version.IndexOf('+');
         if (plus >= 0) version = version[..plus];
@@ -58,6 +67,12 @@ public sealed class LooksMod : IMod
                 LookValues.ApplyCombo(null, PixelPass.Settings);
             }
             Log.Line($"PZA_LOOKS_COMBO={combo}: combo for this run '{PixelPass.Settings.Combo}'");
+        }
+        // 0.7.3: PZA_LOOKS_PRESET="[PZA] Anime": a recommended preset for this run (the variables below still win)
+        if (Environment.GetEnvironmentVariable("PZA_LOOKS_PRESET") is { Length: > 0 } preset)
+        {
+            if (RecommendedPresets.Find(preset) is { } rec) PresetStore.Apply(rec, PixelPass.Settings, null);
+            Log.Line($"PZA_LOOKS_PRESET={preset}: {(RecommendedPresets.Find(preset) is null ? "not a recommended preset, ignored" : "loaded for this run")}");
         }
         if (Environment.GetEnvironmentVariable("PZA_LOOKS_LOOK") is { Length: > 0 } look)
         {

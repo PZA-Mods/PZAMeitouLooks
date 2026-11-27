@@ -72,32 +72,61 @@ public static class PixelShader
         return "const vec3 PAL16LAB[17] = vec3[](" + string.Join(", ", items) + ");\n";
     }
 
-    public static readonly string Fragment = Head.Replace("//@PAL16LAB", LabTable(), StringComparison.Ordinal)
-        .Replace("//@TABLES", Table("PALD8", Desert8) + Table("PALD32", Desert32) + Table("PALN16", Night16), StringComparison.Ordinal);
+    /// <summary>The palettes a look can pick (LookValues.Palettes' order).</summary>
+    public const int PaletteCount = 10;
+
+    /// <summary>0.7.4: the pixel-art program for ONE palette. Each look's palette is fixed at compile time (#define PZA_PAL), so a program
+    /// holds only its own colour code: 0.6.0's single program carried every palette's colour code into each of up to 13 QuantizeCell calls (three
+    /// 32-colour tables passed by value among them), 41,600 bytes of SPIR-V, and a player's AMD RX 6800 XT froze building it at the first
+    /// frame (2026-11-27, PS1 Main, Meitou 0.24.0 and 0.24.1). Same maths per palette as before; an unknown palette = Desert 16.</summary>
+    public static string For(int palette)
+    {
+        int pal = palette is >= 0 and < PaletteCount ? palette : 0;
+        string tables = pal switch
+        {
+            6 => Table("PALT", Desert8) + "#define TN 8\n",
+            7 => Table("PALT", Desert32) + "#define TN 32\n",
+            8 => Table("PALT", Night16) + "#define TN 16\n",
+            _ => "",
+        };
+        return Head.Replace("//@DEFINE", "#define PZA_PAL " + pal.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("//@PAL16LAB", pal == 0 ? LabTable() : "", StringComparison.Ordinal)
+            .Replace("//@TABLES", tables, StringComparison.Ordinal);
+    }
+
+    /// <summary>Desert 16's program (the offline check's old entry point).</summary>
+    public static string Fragment => For(0);
 
     const string Head = """
         #version 330 core
+        //@DEFINE
         in vec2 vUv;
         out vec4 fragColour;
         uniform sampler2D uImage;     // the composite's finished LDR picture (display size, after FXAA / SMAA / heat haze)
         uniform vec2 uViewport;       // display size in pixels
         uniform float uPixelSize, uNativeLines, uDither, uContrast, uShadowLift, uHighlightHold, uScanlines, uCrtSoft, uBleed, uStrength;
-        uniform int uPalette, uLevels, uSampling, uLiftNight, uKeepBlack, uSplit, uFlipY;
+        uniform int uLevels, uSampling, uLiftNight, uKeepBlack, uSplit, uFlipY;
 
         const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 
+        #if PZA_PAL == 0
         // Desert 16 (PZA)
         const vec3 PAL16[16] = vec3[](
             vec3(26, 20, 22) / 255.0, vec3(59, 42, 38) / 255.0, vec3(94, 60, 46) / 255.0, vec3(138, 82, 56) / 255.0,
             vec3(180, 116, 72) / 255.0, vec3(214, 160, 104) / 255.0, vec3(236, 210, 160) / 255.0, vec3(246, 238, 216) / 255.0,
             vec3(110, 106, 94) / 255.0, vec3(160, 154, 136) / 255.0, vec3(76, 94, 72) / 255.0, vec3(124, 140, 90) / 255.0,
             vec3(58, 78, 106) / 255.0, vec3(94, 138, 168) / 255.0, vec3(156, 196, 210) / 255.0, vec3(140, 46, 34) / 255.0);
+        #endif
         //@PAL16LAB
         //@TABLES
+        #if PZA_PAL == 9
         // 0.6.0: the Game Boy's four greens (darkest first), stepped by brightness like LEAF 2-bit
         const vec3 PALGB[4] = vec3[](vec3(15, 56, 15) / 255.0, vec3(48, 98, 48) / 255.0, vec3(139, 172, 15) / 255.0, vec3(155, 188, 15) / 255.0);
+        #endif
+        #if PZA_PAL == 1
         // LEAF 2-bit (PZA)
         const vec3 PAL2[4] = vec3[](vec3(66, 24, 30) / 255.0, vec3(122, 60, 58) / 255.0, vec3(168, 106, 84) / 255.0, vec3(204, 150, 114) / 255.0);
+        #endif
 
         const float BAYER[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
         // the PlayStation's 4x4 dither table, in 8-bit steps, added before truncating to 5 bits per channel
@@ -141,6 +170,7 @@ public static class PixelShader
                         dot(q, vec3(1.9779984951, -2.4285922050, 0.4505937099)),
                         dot(q, vec3(0.0259040371, 0.7827717662, -0.8086757660)));
         }
+        #if PZA_PAL == 0
         vec3 Pal16(int i) { return i < 16 ? PAL16[i] : vec3(0.0); }
 
         // 0.2.4 (the user, 2026-11-17: dust storms through Desert 16 came out grey-green with orange specks): PATTERN dithering (after
@@ -179,36 +209,38 @@ public static class PixelShader
             }
             return res;
         }
+        #endif
 
-        // 0.6.0: Pattern16's pattern dithering for a table palette of n colours (n <= 32; tables padded to 32)
-        vec3 PatternN(vec3 c, float d, vec3 pal[32], vec3 lab[32], int n)
+        #if PZA_PAL >= 6 && PZA_PAL <= 8
+        // 0.6.0: Pattern16's pattern dithering for a table palette of TN colours. 0.7.4: reads its one table (PALT / PALTLAB) directly
+        // instead of taking two 32-entry arrays by value (a copy per call, per QuantizeCell, per pixel), and loops exactly TN times
+        vec3 PatternT(vec3 c, float d)
         {
             vec3 lc = ToOklab(c);
             int near = 0;
             float nearD = 1e9;
-            for (int i = 0; i < 32; ++i)
+            for (int i = 0; i < TN; ++i)
             {
-                if (i >= n) break;
-                vec3 q = lc - lab[i];
+                vec3 q = lc - PALTLAB[i];
                 float dq = dot(q, q);
                 if (dq < nearD) { nearD = dq; near = i; }
             }
             float best = 1e9;
-            vec3 res = pal[near];
-            for (int k = 0; k < 32; ++k)
+            vec3 res = PALT[near];
+            for (int k = 0; k < TN; ++k)
             {
-                if (k >= n) break;
                 int a = min(near, k), b = max(near, k);
-                vec3 la = lab[a], dd = lab[b] - la;
+                vec3 la = PALTLAB[a], dd = PALTLAB[b] - la;
                 float den = dot(dd, dd);
                 float r = den < 1e-12 ? 0.0 : clamp(dot(lc - la, dd) / den, 0.0, 1.0);
                 r = roundEven(r * 16.0) / 16.0;
                 vec3 e3 = lc - (la + dd * r);
                 float e = dot(e3, e3) + 0.15 * den * r * (1.0 - r);
-                if (e < best) { best = e; res = d < r ? pal[b] : pal[a]; }
+                if (e < best) { best = e; res = d < r ? PALT[b] : PALT[a]; }
             }
             return res;
         }
+        #endif
 
         vec3 QuantizeCell(vec2 cell, float ps)
         {
@@ -228,40 +260,41 @@ public static class PixelShader
             int bi = (int(cell.x) & 3) + 4 * (int(cell.y) & 3);
             float d = (BAYER[bi] + 0.5) / 16.0;
             vec3 res;
-            if (uPalette == 1)
+            #if PZA_PAL == 1
             {
                 float t = dot(c, LUMA) * 3.0 + (d - 0.5) * uDither;
                 res = PAL2[clamp(int(floor(t + 0.5)), 0, 3)];
             }
-            else if (uPalette == 2)
+            #elif PZA_PAL == 2
             {
                 float n = float(max(2, uLevels)) - 1.0;
                 res = floor(c * n + 0.5 + (d - 0.5) * uDither) / n;
             }
-            else if (uPalette == 3)
+            #elif PZA_PAL == 3
             {
                 vec3 v = clamp(c * 255.0 + PS1DITHER[bi] * uDither, 0.0, 255.0);
                 res = floor(v / 8.0) / 31.0;
             }
-            else if (uPalette == 4)
+            #elif PZA_PAL == 4
             {
                 vec3 v = clamp(c * 255.0 + N64MAGIC[bi] * uDither, 0.0, 255.0);
                 res = floor(v / 8.0) / 31.0;
             }
-            else if (uPalette == 5)
+            #elif PZA_PAL == 5
             {
                 vec3 n = vec3(7.0, 7.0, 3.0);
                 res = floor(c * n + 0.5 + (d - 0.5) * uDither) / n;
             }
-            else if (uPalette == 6) res = PatternN(c, d, PALD8, PALD8LAB, 8);
-            else if (uPalette == 7) res = PatternN(c, d, PALD32, PALD32LAB, 32);
-            else if (uPalette == 8) res = PatternN(c, d, PALN16, PALN16LAB, 16);
-            else if (uPalette == 9)
+            #elif PZA_PAL >= 6 && PZA_PAL <= 8
+            res = PatternT(c, d);
+            #elif PZA_PAL == 9
             {
                 float t = dot(c, LUMA) * 3.0 + (d - 0.5) * uDither;
                 res = PALGB[clamp(int(floor(t + 0.5)), 0, 3)];
             }
-            else res = Pattern16(c, d);   // Desert 16 (0.2.4): pattern dithering; uDither does not apply (the mix ratio is the dither)
+            #else
+            res = Pattern16(c, d);   // Desert 16 (0.2.4): pattern dithering; uDither does not apply (the mix ratio is the dither)
+            #endif
             return res;
         }
 
@@ -271,7 +304,7 @@ public static class PixelShader
             float ps = uNativeLines > 0.0 ? max(1.0, roundEven(uViewport.y / uNativeLines)) : max(1.0, roundEven(uPixelSize * scale));
             vec2 cell = floor(gp / ps);
             vec3 res = QuantizeCell(cell, ps);
-            if (uPalette == 4)
+            #if PZA_PAL == 4
             {   // the N64 video interface's de-dither filter
                 vec3 sum = res * 2.0, wsum = vec3(2.0);
                 for (int j = -1; j <= 1; ++j) for (int i = -1; i <= 1; ++i)
@@ -283,6 +316,7 @@ public static class PixelShader
                 }
                 res = sum / wsum;
             }
+            #endif
             if (uCrtSoft > 0.0 || uBleed > 0.0)
             {
                 vec3 l = QuantizeCell(cell - vec2(1.0, 0.0), ps);

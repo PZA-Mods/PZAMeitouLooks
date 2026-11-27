@@ -1,10 +1,17 @@
-# PZA's Post-FX for Meitou (beta 0.6.0)
+# PZA's Post-FX for Meitou (beta 0.7.5)
 
 Formerly **PZA's Looks**. Post-processing effects for Meitou's picture: one-pick **Combos**, **Film Noir**, comic **Halftone** dots, an old **CRT / VHS** screen, **Toon** cel lighting, a painted **Kuwahara** look, **N64**
 distance fog, an ink **Outline**, real **Tilt-Shift** miniature looks, a
 **Fisheye** lens, and retro **pixel looks** (chunky pixel art with a desert palette, the PlayStation look with CRT scanlines, a soft
 240-line N64 look). Each effect has ready-made presets and its own sliders. Menus, text and the pointer stay sharp: the effects are
 drawn under Meitou's interface.
+
+**New in 0.7.5:** eight built-in **recommended presets** in the Presets window (Settings > Mods > PZAPostFX > Presets manager):
+[PZA] Anime, Hyper Realistic, Cinematic, Painted Miniature, Comic Book, Film Noir, Retro PS1, 16-Bit Miniature. Load one and play;
+save a copy under your own name to tweak it. On Meitou 0.24.1 and newer, a **Meitou look** list (Clean, Realistic, Cinematic, Film)
+sets Meitou's own tone map, bloom, depth of field, vignette and grain while picked (Off gives your own settings back), and PZA
+Letterbox drives Meitou's own Letterbox, so there are never two sets of bars. Fix: a pixel look could freeze Meitou at start on
+some AMD cards; each palette now builds a much smaller shader, and a launch that froze starts with the Look Off.
 
 **New in 0.6.0:** Combos (one pick sets several effects: Painted Miniature, Ink Miniature, Retro Cel, CRT Anime, Soft 240 Toon,
 16-Bit Miniature, HD-2D, Diorama, Film Noir, Comic Book, Handheld, Found Footage), Film Noir (Default, Sin City keeping red, Silver
@@ -57,10 +64,11 @@ Pick the preset again to get its values back.
 
 ## Requires
 **Meitou 0.20.1 and newer**, on the **Vulkan** renderer, with **HDR output off** (the effects switch themselves off under HDR). Checked
-on Meitou 0.20.1, 0.21.0 and 0.22.1; there is no upper version cap.
+on Meitou 0.20.1 to 0.24.0 and the 0.24.1 nightly; there is no upper version cap. The Meitou look list and the Letterbox
+bridge need Meitou 0.24.1 or newer; on older Meitou the list is hidden and PZA Letterbox draws its own bars.
 
 ## Install
-- On the Steam Workshop: subscribe, then tick **PZAPostFX** in Meitou's mod list. Or by hand: unpack `PZALooks.Meitou-0.6.0-beta.zip` into Kenshi's folder (`Kenshi\mods\PZAPostFX\`), then tick **PZAPostFX** in Meitou's mod list.
+- On the Steam Workshop: subscribe, then tick **PZAPostFX** in Meitou's mod list. Or by hand: unpack `PZALooks.Meitou-0.7.5-beta.zip` into Kenshi's folder (`Kenshi\mods\PZAPostFX\`), then tick **PZAPostFX** in Meitou's mod list.
 - Coming from PZA's Looks 0.2.x: untick **PZALooks** and delete `Kenshi\mods\PZALooks\` first, so it is not loaded twice. Your settings
   start fresh in the new folder.
 - No items or world data; load order doesn't matter. Safe to remove at any time.

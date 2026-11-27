@@ -315,8 +315,8 @@ public static class Noirs
     public static NoirLook? Find(string? name) => All.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.Ordinal));
 }
 
-/// <summary>0.6.3: one Letterbox (LetterboxShader): cinema black bars on top and bottom (Meitou's own letterbox is in a debug menu,
-/// so PZA's Post-FX puts it right on Settings > Mods). Drawn last, after Screen, so bars stay crisp.</summary>
+/// <summary>0.6.3: one Letterbox (LetterboxShader): cinema black bars on top and bottom, drawn last, after Screen, so bars stay crisp.
+/// 0.7.3: on Meitou 0.24.1+, which has its own Letterbox as a Graphics setting, it drives that one instead (MeitouLetterbox.cs).</summary>
 public sealed record LetterboxLook(
     string Name,
     float Aspect,        // target aspect ratio (e.g. 2.39 for anamorphic cinema, 2.00 Univisium, 1.85 widescreen)

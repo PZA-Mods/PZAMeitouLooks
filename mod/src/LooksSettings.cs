@@ -378,6 +378,14 @@ public sealed class LooksSettings
     [Setting(Strings.En.Strength, Hint = Strings.En.ScStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.ScGroup, VisibleWhen = nameof(ScreenOn))]
     public float ScStrength { get; set; } = 1f;
 
+    // ---- Meitou look (0.7.3) ----
+    /// <summary>0.7.3: Meitou's own picture settings laid over the player's (Meitou 0.24.1+ only; hidden before). Off = the player's own.</summary>
+    [Setting(Strings.En.MeitouLookLabel, Hint = Strings.En.MeitouLookHint, Options = ["Off", "PZA Meitou - Clean", "PZA Meitou - Realistic",
+        "PZA Meitou - Cinematic", "PZA Meitou - Film"], VisibleWhen = nameof(MeitouGraphics))]
+    public string MeitouLook { get; set; } = "Off";
+
+    public bool MeitouGraphics => MeitouLetterbox.Active;
+
     // ---- Letterbox (0.6.3) ----
     [Setting(Strings.En.LetterboxLabel, Hint = Strings.En.LetterboxHint, Options = ["Off", "PZA Letterbox - 2.39:1 Cinema",
         "PZA Letterbox - 2.00:1 Univisium", "PZA Letterbox - 1.85:1 Widescreen", "PZA Letterbox - Soft", "Custom"])]
@@ -385,13 +393,16 @@ public sealed class LooksSettings
 
     public bool LetterboxOn => Letterbox != Looks.Off;
 
+    /// <summary>0.7.3: softness and opacity exist only where PZA Letterbox draws its own bars (Meitou's own Letterbox is crisp and solid).</summary>
+    public bool LbOwnBars => LetterboxOn && !MeitouLetterbox.Active;
+
     [Setting(Strings.En.LbAspect, Hint = Strings.En.LbAspectHint, Min = 1.33, Max = 3.0, Step = 0.01, SubGroup = Strings.En.LbGroup, VisibleWhen = nameof(LetterboxOn))]
     public float LbAspect { get; set; } = 2.39f;
 
-    [Setting(Strings.En.LbSoftness, Hint = Strings.En.LbSoftnessHint, Min = 0, Max = 0.15, Step = 0.005, SubGroup = Strings.En.LbGroup, VisibleWhen = nameof(LetterboxOn))]
+    [Setting(Strings.En.LbSoftness, Hint = Strings.En.LbSoftnessHint, Min = 0, Max = 0.15, Step = 0.005, SubGroup = Strings.En.LbGroup, VisibleWhen = nameof(LbOwnBars))]
     public float LbSoftness { get; set; } = 0f;
 
-    [Setting(Strings.En.Strength, Hint = Strings.En.LbStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.LbGroup, VisibleWhen = nameof(LetterboxOn))]
+    [Setting(Strings.En.Strength, Hint = Strings.En.LbStrengthHint, Min = 0, Max = 1, Step = 0.01, SubGroup = Strings.En.LbGroup, VisibleWhen = nameof(LbOwnBars))]
     public float LbStrength { get; set; } = 1f;
 
     // ---- Compare & Presets -----------------------------------------------------------------------------------------------------------------
@@ -617,13 +628,15 @@ static class Strings
         public const string OlDebug = "Debug view";
         public const string OlDebugHint = "Shows raw edge detection instead of the scene: red = depth edges, green = normal/crease edges (matching Dust's Debug View).";
 
+        public const string MeitouLookLabel = "Meitou look";
+        public const string MeitouLookHint = "Meitou's own picture settings, laid over yours while it is picked (never saved into Meitou's settings): Clean turns Meitou's vignette, film grain and depth of field off for the stylised looks; Realistic = hybrid tone map, grade, soft bloom, vignette and grain, light shafts; Cinematic = ACES, shallow depth of field, stronger vignette and grain; Film = heavy grain and vignette. Off gives your own settings back. Meitou 0.24.1 and newer.";
         public const string LetterboxLabel = "Letterbox";
-        public const string LetterboxHint = "Cinema black bars on the top and bottom of the picture (drawn last over every other look; menus and text stay on top).";
+        public const string LetterboxHint = "Cinema black bars at the chosen picture shape. On Meitou 0.24.1 and newer this drives Meitou's own Letterbox (no second set of bars; Off gives your Meitou Letterbox setting back); on older Meitou PZA draws the bars, last over every other look. Menus and text stay on top.";
         public const string LbGroup = "Letterbox";
         public const string LbAspect = "Aspect ratio";
-        public const string LbAspectHint = "Target frame ratio (2.39 = anamorphic cinema, 2.00 = Univisium, 1.85 = widescreen). Wider ratios add taller bars.";
+        public const string LbAspectHint = "Target frame ratio (2.39 = anamorphic cinema, 2.00 = Univisium, 1.85 = widescreen). Wider ratios add taller bars. Meitou's own Letterbox takes 1.33 to 2.76 (wider values are held at 2.76).";
         public const string LbSoftness = "Edge softness";
-        public const string LbSoftnessHint = "Feathers the inner edge of the bars (0 = crisp cinema bars).";
-        public const string LbStrengthHint = "Bar opacity (1 = solid black).";
+        public const string LbSoftnessHint = "Feathers the inner edge of the bars (0 = crisp cinema bars). Only on Meitou before 0.24.1, where PZA draws the bars.";
+        public const string LbStrengthHint = "Bar opacity (1 = solid black). Only on Meitou before 0.24.1, where PZA draws the bars.";
     }
 }

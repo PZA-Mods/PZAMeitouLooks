@@ -62,7 +62,8 @@ public static class PresetsWindow
     {
         if (string.IsNullOrEmpty(s_folder)) return;
         string? keep = s_selected >= 0 && s_selected < s_presets.Count ? s_presets[s_selected].Name : null;
-        s_presets = PresetStore.List(s_folder);
+        // 0.7.3: the built-in recommended presets first ("[PZA] ..."), then the player's own
+        s_presets = [.. RecommendedPresets.All, .. PresetStore.List(s_folder).Where(p => !RecommendedPresets.IsRecommended(p.Name))];
         s_selected = keep is not null ? s_presets.FindIndex(p => string.Equals(p.Name, keep, StringComparison.OrdinalIgnoreCase)) : -1;
     }
 
@@ -70,8 +71,11 @@ public static class PresetsWindow
     {
         bool hasSel = s_selected >= 0 && s_selected < s_presets.Count;
         PzaWindow.Enable(b, "Save", "Share", "Import");
-        if (hasSel) PzaWindow.Enable(b, "Load", "Delete");
-        else { b.Disabled.Add("Load"); b.Disabled.Add("Delete"); }
+        bool builtIn = hasSel && RecommendedPresets.IsRecommended(s_presets[s_selected].Name);
+        if (hasSel) PzaWindow.Enable(b, "Load");
+        else b.Disabled.Add("Load");
+        if (hasSel && !builtIn) PzaWindow.Enable(b, "Delete");
+        else b.Disabled.Add("Delete");
 
         b.Text["Root"] = "PZA'S POST-FX PRESETS";
         PzaWindow.TabText(b, "Tabs", 0, "PRESETS");
@@ -79,7 +83,7 @@ public static class PresetsWindow
         b.Text["lbName"] = "Preset name (saves all active Post-FX settings & sliders):";
         b.Text["edName"] = s_name;
         b.Text["Save"] = "Save";
-        b.Text["lbList"] = $"Saved presets ({s_presets.Count}) — double-click to load:";
+        b.Text["lbList"] = $"Presets ({s_presets.Count}; [PZA] = recommended, built in) — double-click to load:";
         PzaWindow.Lines(b, "lstPresets", s_presets.Select(p => p.Name), s_selected);
         b.Text["Load"] = "Load";
         b.Text["Share"] = "Share code";
@@ -92,6 +96,9 @@ public static class PresetsWindow
             "SAVING PRESETS\nType a name in the top box and click Save. Every Post-FX effect and slider (Outline, Pixel Art, Tilt-Shift, Kuwahara, N64, Toon, Noir, Halftone, Screen) is saved to mods\\PZAPostFX\\presets\\<name>.json. Saving with an existing name overwrites it.\n\n"
             + "LOADING & DELETING\nClick a preset in the list and press Load (or double-click it). All sliders in Settings > Mods update immediately and survive restarts. Note: Toon changes apply on the next game start.\n\n"
             + "SHARING ON DISCORD\nClick 'Share code' to encode your current settings as a single-line PZAFX1:... code in the Share box (select & Ctrl+C). To try someone else's preset, paste their PZAFX1:... code into the Share box and click Import — it applies immediately and saves under its preset name.\n\n"
+            + "RECOMMENDED PRESETS\nThe [PZA] presets at the top of the list ship with the mod: Anime, Hyper Realistic, Cinematic, Painted Miniature, Comic Book, Film Noir, Retro PS1 and 16-Bit Miniature. Load one to try it; save it under your own name to keep a changed copy. They cannot be overwritten or deleted. Anime and Comic Book use Toon, which applies at the next game start.\n\n"
+            + "MEITOU LOOK\nOn Meitou 0.24.1 and newer, the Meitou look list in Settings > Mods lays Meitou's own picture settings over yours while it is picked: Clean (no vignette, grain or depth of field, for stylised looks), Realistic, Cinematic and Film. Nothing is saved into Meitou's settings; Off gives your own back. Hyper Realistic and Cinematic rely on it, so on older Meitou they show only their Post-FX part.\n\n"
+            + "LETTERBOX\nOn Meitou 0.24.1 and newer, PZA Letterbox drives Meitou's own Letterbox, so the bars are never drawn twice: a preset or Custom turns Meitou's Letterbox on at that shape (1.33 to 2.76), Off gives your own Meitou Letterbox setting back. Meitou's bars are crisp and solid, so Soft shows 2.39:1 bars and Edge softness / Strength are hidden. On older Meitou PZA draws the bars itself.\n\n"
             + "OPENING THIS WINDOW\nToggle 'Presets manager' in Settings > Mods > PZA's Post-FX, or open it from F10 > Mods. Esc closes it; F7 hides it with the HUD.");
     }
 
@@ -134,6 +141,7 @@ public static class PresetsWindow
     static void SaveCurrent()
     {
         if (string.IsNullOrEmpty(s_folder)) { s_status = "Mod folder not set."; return; }
+        if (RecommendedPresets.IsRecommended(s_name)) { s_status = "[PZA] names are the built-in presets: save under your own name."; return; }
         if (PresetStore.Save(s_folder, s_name, PixelPass.Settings, out string err) is { } saved)
         {
             Refresh();
@@ -149,6 +157,16 @@ public static class PresetsWindow
     {
         if (s_selected < 0 || s_selected >= s_presets.Count) { s_status = "Select a preset first."; return; }
         string name = s_presets[s_selected].Name;
+        if (RecommendedPresets.Find(name) is { } rec)
+        {
+            PresetStore.Apply(rec, PixelPass.Settings, LooksApi.Group);
+            MeitouLetterbox.Sync(PixelPass.Settings);
+            s_status = $"Loaded '{name}': {RecommendedPresets.Blurb(name)}."
+                + (RecommendedPresets.HasToon(rec) ? " Its Toon applies at the next game start." : "")
+                + (!MeitouLetterbox.Active && PixelPass.Settings.MeitouLook != Looks.Off ? " Its Meitou look needs Meitou 0.24.1 or newer." : "");
+            Log.Line($"presets: loaded recommended '{name}'");
+            return;
+        }
         if (PresetStore.Load(s_folder, name, PixelPass.Settings, LooksApi.Group, out string err))
         {
             s_status = $"Loaded preset '{name}'.";
@@ -188,6 +206,7 @@ public static class PresetsWindow
             return;
         }
         PresetStore.Apply(data, PixelPass.Settings, LooksApi.Group);
+        if (RecommendedPresets.IsRecommended(data.Name)) data = data with { Name = data.Name[RecommendedPresets.Prefix.Length..].Trim() + " (shared)" };
         string? saved = string.IsNullOrEmpty(s_folder) ? null : PresetStore.Save(s_folder, data.Name, PixelPass.Settings, out _);
         Refresh();
         if (saved is not null)

@@ -36,6 +36,7 @@ static class PixelPass
     static bool s_failed, s_hdrLogged;
     static string? s_lastChoice;
     public static int FramesDrawn { get; private set; }
+    static int s_armedAt;
     /// <summary>Test runs: PZA_LOOKS_TILT_DEBUG=1 shows Tilt-Shift's blur mask (black = sharp) instead of the picture.</summary>
     public static bool TiltMask;
     /// <summary>Test runs: PZA_LOOKS_OUTLINE_DEBUG=1 shows the Outline's lines alone (black on white).</summary>
@@ -66,7 +67,7 @@ static class PixelPass
         var noir = LookValues.Noir(Settings);   // 0.6.0
         var ht = LookValues.Halftone(Settings);
         var screen = LookValues.Screen(Settings);
-        var lb = LookValues.Letterbox(Settings);   // 0.6.3
+        var lb = MeitouLetterbox.Active ? null : LookValues.Letterbox(Settings);   // 0.6.3; 0.7.3: Meitou draws its own bars when it has them
         LogChoice(look, tilt, fish, line, kw, n64, noir, ht, screen, lb);
         if (look is null && tilt is null && fish is null && line is null && kw is null && n64 is null && noir is null && ht is null
             && screen is null && lb is null)
@@ -87,7 +88,7 @@ static class PixelPass
             int passes = (look is null ? 0 : 1) + (tilt is null ? 0 : 1) + (fish is null ? 0 : 1) + (line is null ? 0 : 1)
                 + (kw is null ? 0 : 1) + (n64 is null ? 0 : 1) + (noir is null ? 0 : 1) + (ht is null ? 0 : 1)
                 + (screen is null ? 0 : 1) + (lb is null ? 0 : 1);
-            Ensure(__instance, w, h, passes >= 2);
+            Ensure(__instance, w, h, passes >= 2, look);
             __state = final;
             (s_frameLook, s_frameTilt, s_frameFish, s_frameLine) = (look, tilt, fish, line);
             (s_frameKw, s_frameN64) = (kw, n64);
@@ -149,6 +150,9 @@ static class PixelPass
                 }
                 Access.Stamp(__instance, steps[i].Stamp);
             }
+            // 0.7.4: the safe start's marker is cleared only once two MORE frames came through, so a pipeline the driver builds at
+            // submit time (not in our draw call) is covered too
+            if (SafeStart.Armed && FramesDrawn >= s_armedAt + 2) SafeStart.Disarm();
             if (FramesDrawn++ == 0)
                 Log.Line($"first frame drawn: look '{s_frameLook?.Name ?? Looks.Off}', Tilt-Shift '{s_frameTilt?.Name ?? Looks.Off}', "
                     + $"Fisheye '{s_frameFish?.Name ?? Looks.Off}', Outline '{s_frameLine?.Name ?? Looks.Off}', Kuwahara '{s_frameKw?.Name ?? Looks.Off}', "
@@ -162,9 +166,14 @@ static class PixelPass
     }
 
     /// <summary>The programs (first time) and our pictures at the display size (again after a resize; the old ones are freed after the frames in flight).</summary>
-    static void Ensure(PostProcess pp, int w, int h, bool needB)
+    static void Ensure(PostProcess pp, int w, int h, bool needB, PixelLook? look)
     {
-        LookPass.Ensure(pp);
+        if (look is not null)
+        {
+            bool was = SafeStart.Armed;
+            LookPass.Ensure(pp, look);
+            if (SafeStart.Armed && !was) s_armedAt = FramesDrawn;
+        }   // 0.7.4: only when a pixel look is on, for its palette
         TiltPass.Ensure(pp);
         FisheyePass.Ensure(pp);
         OutlinePass.Ensure(pp);
@@ -206,31 +215,50 @@ static class PixelPass
     }
 }
 
-/// <summary>The pixel-art look (PixelShader).</summary>
+/// <summary>The pixel-art look (PixelShader). 0.7.4: one program per palette (PixelShader.For), compiled the first time a look with that
+/// palette is drawn, so a program holds only its own colour code; the safe start marks each one's first draw.</summary>
 static class LookPass
 {
-    public static LegacyProgram? Program;
-    static SamplerSlot s_image;
-    static UniformHandle s_viewport, s_pixelSize, s_nativeLines, s_dither, s_contrast, s_shadowLift, s_highlightHold, s_scanlines, s_crtSoft,
-        s_bleed, s_strength, s_palette, s_levels, s_sampling, s_liftNight, s_keepBlack, s_split, s_flipY;
-
-    public static void Ensure(PostProcess pp)
+    sealed class Prog
     {
-        if (Program is not null) return;
-        var p = Program = LegacyProgram.Create(pp.Gpu, Access.Vertex!, PixelShader.Fragment, "pza looks pixel art");
-        s_image = p.Sampler("uImage");
-        (s_viewport, s_pixelSize, s_nativeLines, s_dither, s_contrast) = (p.Uniform("uViewport"), p.Uniform("uPixelSize"), p.Uniform("uNativeLines"),
-            p.Uniform("uDither"), p.Uniform("uContrast"));
-        (s_shadowLift, s_highlightHold, s_scanlines, s_crtSoft, s_bleed) = (p.Uniform("uShadowLift"), p.Uniform("uHighlightHold"),
-            p.Uniform("uScanlines"), p.Uniform("uCrtSoft"), p.Uniform("uBleed"));
-        (s_strength, s_palette, s_levels, s_sampling) = (p.Uniform("uStrength"), p.Uniform("uPalette"), p.Uniform("uLevels"), p.Uniform("uSampling"));
-        (s_liftNight, s_keepBlack, s_split, s_flipY) = (p.Uniform("uLiftNight"), p.Uniform("uKeepBlack"), p.Uniform("uSplit"), p.Uniform("uFlipY"));
-        Log.Line("pixel art program compiled");
+        public required LegacyProgram P;
+        public SamplerSlot Image;
+        public UniformHandle Viewport, PixelSize, NativeLines, Dither, Contrast, ShadowLift, HighlightHold, Scanlines, CrtSoft, Bleed, Strength, Levels,
+            Sampling, LiftNight, KeepBlack, Split, FlipY;
+    }
+
+    static readonly Dictionary<int, Prog> s_progs = [];
+    static Prog? s_cur;
+
+    /// <summary>The program for the palette Ensure picked this frame.</summary>
+    public static LegacyProgram? Program => s_cur?.P;
+
+    public static void Ensure(PostProcess pp, PixelLook look)
+    {
+        int palette = look.Palette is >= 0 and < PixelShader.PaletteCount ? look.Palette : 0;
+        if (s_progs.TryGetValue(palette, out var have)) { s_cur = have; return; }
+        // the safe start: written before this program's first draw, cleared once that frame is drawn (PixelPass.Postfix)
+        SafeStart.Arm($"the pixel look '{look.Name}' (palette {LookValues.Palettes[palette]})");
+        var p = LegacyProgram.Create(pp.Gpu, Access.Vertex!, PixelShader.For(palette), "pza looks pixel art " + palette);
+        var g = new Prog
+        {
+            P = p, Image = p.Sampler("uImage"), Viewport = p.Uniform("uViewport"), PixelSize = p.Uniform("uPixelSize"), NativeLines = p.Uniform("uNativeLines"),
+            Dither = p.Uniform("uDither"), Contrast = p.Uniform("uContrast"), ShadowLift = p.Uniform("uShadowLift"), HighlightHold = p.Uniform("uHighlightHold"),
+            Scanlines = p.Uniform("uScanlines"), CrtSoft = p.Uniform("uCrtSoft"), Bleed = p.Uniform("uBleed"), Strength = p.Uniform("uStrength"),
+            Levels = p.Uniform("uLevels"), Sampling = p.Uniform("uSampling"), LiftNight = p.Uniform("uLiftNight"), KeepBlack = p.Uniform("uKeepBlack"),
+            Split = p.Uniform("uSplit"), FlipY = p.Uniform("uFlipY"),
+        };
+        s_progs[palette] = s_cur = g;
+        Log.Line($"pixel art program compiled for palette {LookValues.Palettes[palette]}");
     }
 
     public static void Set(PostProcess pp, PixelLook l, object source, (int W, int H) size, bool split)
     {
-        var p = Program!;
+        var g = s_cur!;
+        var p = g.P;
+        var (s_image, s_viewport, s_pixelSize, s_nativeLines, s_dither, s_contrast) = (g.Image, g.Viewport, g.PixelSize, g.NativeLines, g.Dither, g.Contrast);
+        var (s_shadowLift, s_highlightHold, s_scanlines, s_crtSoft, s_bleed, s_strength) = (g.ShadowLift, g.HighlightHold, g.Scanlines, g.CrtSoft, g.Bleed, g.Strength);
+        var (s_levels, s_sampling, s_liftNight, s_keepBlack, s_split, s_flipY) = (g.Levels, g.Sampling, g.LiftNight, g.KeepBlack, g.Split, g.FlipY);
         Access.Bind(pp, p, s_image, source);
         p.Set(s_viewport, size.W, (float)size.H);
         p.Set(s_pixelSize, l.PixelSize);
@@ -243,7 +271,6 @@ static class LookPass
         p.Set(s_crtSoft, l.CrtSoft);
         p.Set(s_bleed, l.Bleed);
         p.Set(s_strength, l.Strength);
-        p.Set(s_palette, l.Palette);
         p.Set(s_levels, l.Levels);
         p.Set(s_sampling, l.Sampling);
         p.Set(s_liftNight, l.LiftNight ? 1 : 0);
